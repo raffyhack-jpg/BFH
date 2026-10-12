@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Recover and convert original map and weapon assets
+        run: bash scripts/prepare_original_assets.sh
       - name: Validate original character assets
         run: bash scripts/check_animation.sh
       - name: Build and test
@@ -25,4 +27,4 @@ jobs:
           gh release create "$tag" build/PocketFront-unsigned.ipa \
             --target "$GITHUB_SHA" --prerelease \
             --title "iPhone prototype ${GITHUB_SHA:0:12}" \
-            --notes "Unsigned ARM64 iPhone prototype. SceneKit import, game-core checks and Xcode build passed. Requires device signing. Original faction models use original weighted skeletal animation. Original maps, weapons and full gameplay fidelity remain unfinished."
+            --notes "Unsigned ARM64 iPhone prototype. SceneKit import, game-core checks and Xcode build passed. Requires device signing. Original faction models use original weighted skeletal animation. Original heat map terrain, buildings, placements, textures and six faction weapons are converted from the verified original client. Gameplay fidelity and the rest of the maps and vehicles remain unfinished."

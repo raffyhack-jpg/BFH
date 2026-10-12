@@ -12,7 +12,7 @@ struct V2: Equatable {
 }
 enum Mode: String, CaseIterable { case conquest = "Conquest", flags = "Capture the Flag", elimination = "Elimination", rocket = "Rocket Control" }
 enum HeroClass: String, CaseIterable {
-    case soldier = "Soldier", heavy = "Heavy", scout = "Scout"
+    case soldier = "Soldier", heavy = "Gunner", scout = "Commando"
     var hp: Double { self == .heavy ? 160 : self == .scout ? 85 : 115 }
     var speed: Double { self == .heavy ? 4.2 : self == .scout ? 6.4 : 5.2 }
     var damage: Double { self == .scout ? 36 : self == .heavy ? 13 : 19 }
@@ -20,6 +20,11 @@ enum HeroClass: String, CaseIterable {
     var range: Double { self == .scout ? 28 : self == .heavy ? 17 : 22 }
 }
 struct Block { var center: V2; var half: V2 }
+struct MapLayout {
+    var bases:[V2],objectives:[V2],blocks:[Block]
+    var extent:Double,gridStep:Double
+    var walkable:(V2)->Bool
+}
 struct Objective { var p: V2; var progress: Double = 0; var owner: Int = -1 }
 struct Flag { var home: V2; var p: V2; var carrier: Int?; var droppedAt: Double = 0 }
 final class Hero {
@@ -46,10 +51,12 @@ struct RNG {
 final class Game {
     let mode: Mode
     var heroes: [Hero] = []
-    let bases = [V2(x:-24,z:0),V2(x:24,z:0)]
-    var objectives: [Objective]
-    var flags: [Flag]
-    let blocks: [Block] = [
+    var bases = [V2(x:-24,z:0),V2(x:24,z:0)]
+    var mapLayout:MapLayout?
+    var spatialBlocks:[Int:[Block]]=[:]
+    var objectives: [Objective] = []
+    var flags: [Flag] = []
+    var blocks: [Block] = [
         Block(center:V2(x:-12,z:-9),half:V2(x:3,z:3)), Block(center:V2(x:12,z:9),half:V2(x:3,z:3)),
         Block(center:V2(x:-10,z:9),half:V2(x:2,z:4)), Block(center:V2(x:10,z:-9),half:V2(x:2,z:4)),
         Block(center:V2(x:0,z:-10),half:V2(x:3,z:2)), Block(center:V2(x:0,z:10),half:V2(x:3,z:2)),
@@ -57,18 +64,39 @@ final class Game {
     var score = [0.0,0.0]; var tickets = [70.0,70.0]
     var elapsed = 0.0; var winner: Int?; var shots: [Shot] = []; var message = ""
     var rng = RNG(); var paused = false
-    init(mode: Mode, hero: HeroClass, seed: UInt64 = 42) {
+    init(mode: Mode, hero: HeroClass, seed: UInt64 = 42, layout:MapLayout?=nil) {
         self.mode=mode; rng.state=seed
-        objectives = mode == .rocket ? [Objective(p:.zero)] : [Objective(p:V2(x:-17,z:0)),Objective(p:.zero),Objective(p:V2(x:17,z:0))]
+        mapLayout=layout
+        if let layout=layout { bases=layout.bases; blocks=layout.blocks }
+        for b in blocks {
+            for x in Int(floor((b.center.x-b.half.x-1)/8))...Int(floor((b.center.x+b.half.x+1)/8)) {
+                for z in Int(floor((b.center.z-b.half.z-1)/8))...Int(floor((b.center.z+b.half.z+1)/8)) { spatialBlocks[x*10000+z,default:[]].append(b) }
+            }
+        }
+        objectives = layout?.objectives.map{Objective(p:$0)} ?? [Objective(p:V2(x:-17,z:0)),Objective(p:.zero),Objective(p:V2(x:17,z:0))]
+        if mode == .rocket { objectives=[objectives[objectives.count/2]] }
+        for i in bases.indices { bases[i]=nearestFree(bases[i]) }
+        for i in objectives.indices { objectives[i].p=nearestFree(objectives[i].p) }
         flags = [Flag(home:bases[0],p:bases[0]),Flag(home:bases[1],p:bases[1])]
         for i in 0..<12 {
             let team = i < 6 ? 0 : 1
             let kind = i == 0 ? hero : HeroClass.allCases[i%3]
-            heroes.append(Hero(i,team,kind,bases[team]+V2(x:0,z:Double(i%6)-2.5)))
+            heroes.append(Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%6)-2.5))))
         }
     }
     func free(_ p: V2) -> Bool {
-        abs(p.x) < 28 && abs(p.z) < 18 && !blocks.contains { abs(p.x-$0.center.x)<$0.half.x+0.45 && abs(p.z-$0.center.z)<$0.half.z+0.45 }
+        let extent=mapLayout?.extent ?? 28
+        let within=abs(p.x)<extent && abs(p.z)<(mapLayout == nil ? 18 : extent)
+        let nearby=spatialBlocks[Int(floor(p.x/8))*10000+Int(floor(p.z/8))] ?? []
+        return within && (mapLayout?.walkable(p) ?? true) && !nearby.contains { abs(p.x-$0.center.x)<$0.half.x+0.45 && abs(p.z-$0.center.z)<$0.half.z+0.45 }
+    }
+    func nearestFree(_ p:V2) -> V2 {
+        if free(p) { return p }
+        for radius in 1...30 { for i in 0..<32 {
+            let a=Double(i)*Double.pi/16;let q=p+V2(x:cos(a),z:sin(a))*Double(radius)
+            if free(q) { return q }
+        } }
+        return p
     }
     func visible(_ a: V2, _ b: V2) -> Bool {
         let d=b-a; let n=max(1,Int(d.length/0.45))
@@ -85,24 +113,51 @@ final class Game {
     // Grid A*: deterministic, small bounded arena; collision footprint matches movement.
     func route(_ a: V2, _ b: V2) -> [V2] {
         if visible(a,b) { return [b] }
-        func point(_ key: Int) -> V2 { V2(x:Double(key%57)-28,z:Double(key/57)-18) }
-        func key(_ p: V2) -> Int { Int(max(-18,min(18,p.z)).rounded()+18)*57+Int(max(-28,min(28,p.x)).rounded()+28) }
-        let start=key(a), end=key(b)
-        var open:Set<Int>=[start], cost=[start:0.0], parent:[Int:Int]=[:], closed:Set<Int>=[]
-        while !open.isEmpty {
-            let current=open.min { (cost[$0] ?? 1e9)+point($0).distance(b) < (cost[$1] ?? 1e9)+point($1).distance(b) }!
+        let step=mapLayout?.gridStep ?? 1,extent=mapLayout?.extent ?? 28,zExtent=mapLayout?.extent ?? 18
+        let width=Int(extent*2/step)+1
+        func point(_ key:Int)->V2 { V2(x:Double(key%width)*step-extent,z:Double(key/width)*step-zExtent) }
+        func key(_ p:V2)->Int { Int(((max(-zExtent,min(zExtent,p.z))+zExtent)/step).rounded())*width+Int(((max(-extent,min(extent,p.x))+extent)/step).rounded()) }
+        let goal=nearestFree(b)
+        func nearestKey(_ p:V2)->Int {
+            let center=key(p)
+            for radius in 0...6 {
+                var best:Int?;var distance=Double.infinity
+                for x in -radius...radius { for z in -radius...radius {
+                    let k=center+x+z*width;guard k>=0 else { continue }
+                    let q=point(k)
+                    if free(q) && visible(p,q) && q.distance(p)<distance { best=k;distance=q.distance(p) }
+                } }
+                if let best=best { return best }
+            }
+            return center
+        }
+        let start=nearestKey(a),end=nearestKey(goal)
+        var heap:[(Int,Double)]=[],cost=[start:0.0],parent:[Int:Int]=[:],closed:Set<Int>=[]
+        func push(_ entry:(Int,Double)) {
+            heap.append(entry);var i=heap.count-1
+            while i>0 { let p=(i-1)/2;if heap[p].1<=heap[i].1 { break };heap.swapAt(p,i);i=p }
+        }
+        func pop()->Int {
+            let result=heap[0].0;let last=heap.removeLast()
+            if !heap.isEmpty { heap[0]=last;var i=0
+                while i*2+1<heap.count { var c=i*2+1;if c+1<heap.count && heap[c+1].1<heap[c].1 { c+=1 };if heap[i].1<=heap[c].1 { break };heap.swapAt(i,c);i=c }
+            };return result
+        }
+        push((start,a.distance(goal)))
+        while !heap.isEmpty {
+            let current=pop();if closed.contains(current) { continue }
             if current == end {
-                var result=[b]; var k=current
+                var result=[goal]; var k=current
                 while k != start, let prev=parent[k] { result.append(point(k)); k=prev }
                 return Array(result.reversed())
             }
-            open.remove(current); closed.insert(current)
+            closed.insert(current)
             let p=point(current)
             for d in [V2(x:1,z:0),V2(x:-1,z:0),V2(x:0,z:1),V2(x:0,z:-1)] {
-                let q=p+d; guard free(q) else { continue }
+                let q=p+d*step; guard free(q) && visible(p,q) else { continue }
                 let k=key(q); guard !closed.contains(k) else { continue }
-                let c=(cost[current] ?? 0)+1
-                if c < (cost[k] ?? 1e9) { cost[k]=c; parent[k]=current; open.insert(k) }
+                let c=(cost[current] ?? 0)+step
+                if c < (cost[k] ?? 1e9) { cost[k]=c; parent[k]=current; push((k,c+point(k).distance(goal))) }
             }
         }
         return []
@@ -112,6 +167,13 @@ final class Game {
         switch mode {
         case .flags:
             let enemy=1-h.team
+            if mapLayout != nil {
+                if flags[enemy].carrier==h.id { return flags[h.team].home }
+                if let carrier=flags[h.team].carrier { return heroes[carrier].p }
+                if flags[h.team].p.distance(flags[h.team].home)>1 { return flags[h.team].p }
+                if h.id%4==1 { return flags[h.team].home }
+                return flags[enemy].p
+            }
             if flags[enemy].carrier == h.id {
                 // Take a side lane home rather than returning through the main firefight.
                 if (h.team == 0 && h.p.x>6) || (h.team == 1 && h.p.x < -6) {
@@ -193,7 +255,7 @@ final class Game {
             if !h.alive {
                 h.respawn-=dt
                 if h.respawn<=0 && mode != .elimination {
-                    h.hp=h.kind.hp; h.p=bases[h.team]+V2(x:0,z:Double(h.id%6)-2.5); h.invulnerable=2; h.path=[]
+                    h.hp=h.kind.hp; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%6)-2.5)); h.invulnerable=2; h.path=[]
                 }
                 continue
             }

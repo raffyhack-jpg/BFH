@@ -9,10 +9,12 @@ permission; the MIT license covers original code only.
 ## Included
 
 - Native Swift/UIKit/SceneKit app for landscape iPhone, iOS 15+.
-- Offline 6v6: one player and eleven bots, three classes (Soldier, Heavy, Scout).
+- Offline 6v6: one player and eleven bots, three classes (Soldier, Gunner, Commando).
 - Original Royal/National base models: 2,406 vertices and 2,286 triangles per
   faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire/death clips.
-- One compact original arena with cover, buildings, trees, and simple weapons.
+- Original heat map terrain, town buildings, trees, props and original object placements.
+- Original Royal/National SMG, machine gun and sniper meshes and textures.
+- Original sky dome/sky texture, capture flags and flagpole geometry.
 - Conquest: capture three points, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
   dropped flags return after eighteen seconds.
@@ -34,6 +36,8 @@ horizontal aim assistance. Pause opens Resume/New Match; backgrounding pauses.
 On a Mac with Xcode installed and first-launch components ready:
 
 ```sh
+bash scripts/prepare_original_assets.sh
+bash scripts/check_animation.sh
 bash scripts/build_unsigned.sh
 ```
 
@@ -47,12 +51,19 @@ For ordinary device development, open `PocketFront.xcodeproj`, choose a personal
 team in Signing & Capabilities, set a unique bundle identifier, and build to your
 connected device in Xcode.
 
-GitHub Actions builds on macOS when pushing main or codex/pocketfront-ios. The
-workflow validates SceneKit assets, runs core checks, compiles, and attempts to
-upload `PocketFront-unsigned`. The account's Actions artifact storage quota was
-full during the initial build. A private-release upload needs an approved change
-to give the publishing job repository contents-write permission. Private
-repository runs consume Actions minutes.
+GitHub Actions recovers the SHA-1 verified original 1.105 installer, converts
+original scenery and weapon files, validates them, then builds on macOS.
+Generated world assets are bundled in the IPA; they are not checked into Git.
+The source archive is about 1.2 GB, so first preparation needs a network connection
+and disk space. On macOS the preparation script installs innoextract through
+Homebrew and uses a local Python virtual environment with NumPy and Pillow.
+
+The manual `publish-ipa.yml` workflow publishes the IPA as a private prerelease
+asset. Select Run workflow on main; download the IPA from Releases. Ordinary
+builds still attempt an Actions artifact upload, which can fail when account
+artifact storage is full. Such an upload failure does not demonstrate a build
+failure; consult the asset and compile steps. Publishing has contents-write
+permission only for its manually dispatched publishing job.
 
 ## Original assets
 
@@ -77,16 +88,36 @@ There has been no iPhone installation, touch playtest, frame-rate/thermal profil
 or bot difficulty/balance playtest. No build should be described as a polished
 finished game.
 
-Original map reconstruction, vehicles/aircraft, original weapon geometry/audio,
-complete original animation coverage, cosmetics/progression, faithful class abilities,
-network play, controller support, accessibility, and reproduction of all
-historical modes remain unfinished. Original characters now animate using original clips;
-prototype maps, weapons, mechanics, and class names still differ from BFH.
+The procedural arena and box guns have been removed from normal gameplay.
+`tools/original/convert_world.py` converts the map's original height field,
+color tiles, object placement script, building/tree/prop meshes, six faction
+weapons, flags and sky. Source entries are checked against ZIP CRCs and recorded
+with SHA-256 provenance. Meshes use native interleaved geometry buffers; textures
+are converted from DDS to PNG. The world is built during CI from verified source
+rather than padding the IPA with unused archive data. The IPA verifier requires
+all referenced geometry and textures to be present. Missing original world or
+character data causes an explicit load failure instead of a primitive fallback.
+
+Original buildings are placed at their original positions and rotations; hero
+and camera heights follow the terrain. Bots use spatial collision lookup and
+heap-based A* on the larger original map. Footprints are approximate rotated
+bounds, not the original collision engine. Native checks require walkable
+spawns and routes from both bases to every converted objective.
+
+This is still incomplete: only one original map is converted. Playable vehicles,
+aircraft, original weapon audio, complete animation/clothing coverage,
+cosmetics/progression, faithful class abilities, network play, controller
+support, accessibility and reproduction of every historical mode remain
+unfinished. Map import and a successful build do not establish device visual
+fidelity, bot balance or a polished recreation. No iPhone playtest has happened.
 
 ## Source map
 
 - App/Game.swift: gameplay, mode rules, bot navigation (Foundation only).
 - App/App.swift: app lifecycle, touch controls, menus, SceneKit renderer.
+- App/OriginalWorld.swift: original scenery, weapon loading, terrain sampling.
+- tools/original: verified archive recovery, original mesh reader, conversion.
+- scripts/prepare_original_assets.sh: reproducible original-world preparation.
 - Assets/Characters: converted original base characters and provenance.
 - Tests/main.swift: deterministic simulation checks.
 - scripts/check_assets.swift: native SceneKit import/geometry validation.

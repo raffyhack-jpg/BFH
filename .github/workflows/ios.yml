@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Recover and convert original map and weapon assets
+        run: bash scripts/prepare_original_assets.sh
       - name: Validate original meshes and skeletal playback
         run: bash scripts/check_animation.sh
       - name: Build and test

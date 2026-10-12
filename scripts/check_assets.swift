@@ -20,6 +20,21 @@ for name in ["royal", "national"] {
     print("Validated original \(name): \(vertices) vertices / \(elements) triangles")
 }
 
+let original=try OriginalWorld(directory:URL(fileURLWithPath:"Assets/OriginalWorld",isDirectory:true))
+let world=SCNNode();try original.populate(world)
+precondition(original.map.instances.count>500,"Original scenery was not packaged")
+for team in 0..<2 { for kind in HeroClass.allCases {
+    let weapon=try original.weapon(kind,team)
+    precondition(!weapon.childNodes.isEmpty,"Original weapon geometry missing")
+} }
+let mapGame=Game(mode:.conquest,hero:.soldier,layout:original.layout)
+for base in mapGame.bases { precondition(mapGame.free(base),"Original spawn is blocked") }
+for objective in mapGame.objectives {
+    precondition(mapGame.free(objective.p),"Original objective is blocked")
+    for base in mapGame.bases { precondition(!mapGame.route(base,objective.p).isEmpty,"Bots cannot reach an objective on original terrain") }
+}
+print("Validated original map: \(original.map.instances.count) placements, six weapons, terrain sampling and connected objective routes")
+
 for faction in ["royal", "national"] {
     let directory=URL(fileURLWithPath:"Assets/Characters",isDirectory:true)
     print("Building weighted skeleton: \(faction)")
