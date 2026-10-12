@@ -32,6 +32,7 @@ final class Stick: UIView {
 final class GameController: UIViewController {
     let render=SCNView(); let scene=SCNScene(); let camera=SCNNode(); let target=SCNNode()
     var game:Game?; var selectedClass=HeroClass.soldier; var selectedMode=Mode.conquest
+    var animators:[AnimatedCharacter?]=[]; var previousPositions:[V2]=[]
     var nodes:[SCNNode]=[]; var objectiveNodes:[SCNNode]=[]; var flagNodes:[SCNNode]=[]
     let effects=SCNNode(); let world=SCNNode(); let hud=UILabel(); let notice=UILabel()
     var left=Stick(frame:CGRect(x:0,y:0,width:116,height:116)); var right=Stick(frame:CGRect(x:0,y:0,width:116,height:116))
@@ -72,21 +73,17 @@ final class GameController: UIViewController {
         let g=SCNBox(width:w,height:h,length:l,chamferRadius:0.08); g.firstMaterial?.diffuse.contents=color; g.firstMaterial?.roughness.contents=0.95; return SCNNode(geometry:g)
     }
     func sphere(_ radius:CGFloat,_ color:UIColor) -> SCNNode { let g=SCNSphere(radius:radius); g.segmentCount=10; g.firstMaterial?.diffuse.contents=color; return SCNNode(geometry:g) }
-    var characterTemplates: [Int:SCNNode] = [:]
     func soldier(_ kind:HeroClass,_ team:Int) -> SCNNode {
         let faction=team == 0 ? "royal" : "national"
-        if characterTemplates[team] == nil,
-           let url=Bundle.main.url(forResource:faction,withExtension:"dae",subdirectory:"Assets/Characters"),
-           let imported=try? SCNScene(url:url,options:nil) {
-            characterTemplates[team]=imported.rootNode
-        }
-        if let template=characterTemplates[team] {
-            let root=SCNNode()
-            for child in template.childNodes { root.addChildNode(child.clone()) }
+        if let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Characters"),
+           let animator=try? AnimatedCharacter(faction,directory:directory) {
+            animators.append(animator)
+            let root=animator.node
             let marker=sphere(0.1,team == 0 ? blue : red); marker.position.y=2.3; root.addChildNode(marker)
-            let gun=box(0.16,0.16,kind == .scout ? 1.3 : 0.85,UIColor(white:0.2,alpha:1)); gun.position=SCNVector3(0.4,1.15,0.65); root.addChildNode(gun)
+            let gun=box(0.16,0.16,kind == .scout ? 1.3 : 0.85,UIColor(white:0.2,alpha:1)); gun.name="held-weapon"; gun.position=SCNVector3(0.4,1.15,0.65); root.addChildNode(gun)
             return root
         }
+        animators.append(nil)
         return placeholderSoldier(kind,team)
     }
     func placeholderSoldier(_ kind:HeroClass,_ team:Int) -> SCNNode {
@@ -98,14 +95,14 @@ final class GameController: UIViewController {
             let leg=box(0.23,0.65,0.28,.darkGray); leg.position=SCNVector3(side*0.2,0.36,0); root.addChildNode(leg)
             let arm=box(0.19,0.6,0.23,color); arm.position=SCNVector3(side*0.47,1.1,0.12); root.addChildNode(arm)
         }
-        let gun=box(0.16,0.16,kind == .scout ? 1.3 : 0.85,UIColor(white:0.2,alpha:1)); gun.position=SCNVector3(0.4,1.15,0.65); root.addChildNode(gun)
+        let gun=box(0.16,0.16,kind == .scout ? 1.3 : 0.85,UIColor(white:0.2,alpha:1)); gun.name="held-weapon"; gun.position=SCNVector3(0.4,1.15,0.65); root.addChildNode(gun)
         let marker=sphere(0.09,color); marker.position.y=2.25; root.addChildNode(marker)
         return root
     }
     func start() {
         menu?.removeFromSuperview(); menu=nil; firing=false; yaw = .pi/2; pitch=0.2; left.reset(); right.reset()
         let g=Game(mode:selectedMode,hero:selectedClass); game=g
-        world.childNodes.forEach{$0.removeFromParentNode()}; effects.childNodes.forEach{$0.removeFromParentNode()}; nodes=[]; objectiveNodes=[]; flagNodes=[]
+        world.childNodes.forEach{$0.removeFromParentNode()}; effects.childNodes.forEach{$0.removeFromParentNode()}; nodes=[]; animators=[]; previousPositions=g.heroes.map{$0.p}; objectiveNodes=[]; flagNodes=[]
         let ground=box(62,0.4,42,UIColor(red:0.52,green:0.68,blue:0.32,alpha:1)); ground.position.y = -0.25; world.addChildNode(ground)
         let road=box(56,0.02,5,UIColor(red:0.76,green:0.68,blue:0.48,alpha:1)); road.position.y=0; world.addChildNode(road)
         for (i,b) in g.blocks.enumerated() {
@@ -151,7 +148,14 @@ final class GameController: UIViewController {
         let move=forward * -Double(left.value.y)+sideways*Double(left.value.x)
         g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false))
         for (i,h) in g.heroes.enumerated() {
-            nodes[i].position=SCNVector3(h.p.x,0,h.p.z); nodes[i].eulerAngles.y=Float(h.facing); nodes[i].isHidden = !h.alive
+            nodes[i].position=SCNVector3(h.p.x,0,h.p.z); nodes[i].eulerAngles.y=Float(h.facing); if let animator=animators[i] {
+                animator.update(dt,position:h.p,moving:h.p.distance(previousPositions[i])>0.003,firing:h.cooldown>h.kind.interval-0.08,ability:h.ability>11.5,alive:h.alive)
+                if let gun=nodes[i].childNode(withName:"held-weapon",recursively:false) {
+                    let hand=animator.bones[44].convertPosition(SCNVector3Zero,to:animator.node)
+                    gun.position=SCNVector3(hand.x,hand.y,hand.z+0.25)
+                }
+            } else { nodes[i].isHidden = !h.alive }
+            previousPositions[i]=h.p
             nodes[i].opacity=h.invulnerable>0 ? 0.55 : 1
         }
         for (i,o) in g.objectives.enumerated() where i<objectiveNodes.count { objectiveNodes[i].geometry?.firstMaterial?.diffuse.contents=o.owner == 0 ? blue : o.owner == 1 ? red : UIColor.white }

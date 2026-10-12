@@ -11,7 +11,7 @@ permission; the MIT license covers original code only.
 - Native Swift/UIKit/SceneKit app for landscape iPhone, iOS 15+.
 - Offline 6v6: one player and eleven bots, three classes (Soldier, Heavy, Scout).
 - Original Royal/National base models: 2,406 vertices and 2,286 triangles per
-  faction, with original 1024px uniform textures. Static bind poses only.
+  faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire clips.
 - One compact original arena with cover, buildings, trees, and simple weapons.
 - Conquest: capture three points, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
@@ -61,9 +61,9 @@ https://archive.org/details/battlefield-heroes-setup and verified against its
 published SHA-1: `7b77439053f6e79ebf5a9020b22aff85e49195e6`.
 This confirms the archived download, not independent identity against EA hashes.
 Original base meshes and uniform textures were extracted from Soldiers_client.zip
-and converted to static COLLADA/PNG using the MIT-licensed mesh reader from
+and converted to COLLADA/PNG plus weighted skeleton/clip data using the MIT-licensed mesh reader from
 https://github.com/marekzajac97/bf2-blender. The conversion changes coordinate
-handedness and UV convention, and omits bone weights and animations. Original
+handedness and UV convention, and preserves original two-bone vertex weights, inverse-bind transforms, and decoded motion clips in companion rig files. Original
 installer artwork is also included. Provenance is recorded in Assets.
 
 ## Validation and limits
@@ -78,9 +78,9 @@ or bot difficulty/balance playtest. No build should be described as a polished
 finished game.
 
 Original map reconstruction, vehicles/aircraft, original weapon geometry/audio,
-skeletally animated characters, cosmetics/progression, faithful class abilities,
+complete original animation coverage, cosmetics/progression, faithful class abilities,
 network play, controller support, accessibility, and reproduction of all
-historical modes remain unfinished. Original characters use static poses;
+historical modes remain unfinished. Original characters now animate using original clips;
 prototype maps, weapons, mechanics, and class names still differ from BFH.
 
 ## Source map
@@ -96,3 +96,17 @@ prototype maps, weapons, mechanics, and class names still differ from BFH.
 
 Original code: MIT. EA assets retain their original ownership and are excluded
 from the MIT license.
+
+## Skeletal animation update
+
+`App/Animation.swift` builds GPU-skinned character geometry from the original
+vertex weights and inverse-bind matrices, uses the 74-bone original skeletons,
+and decodes original idle, running, and firing animation tracks. Firing layers
+over locomotion on the upper body. Royal tonic animation is included when
+available; the National variant currently has no converted ability clip. Pose
+transitions blend, root translation is removed so gameplay movement controls
+position, and death/respawn use a procedural fall/reset. A mapping translates
+the legacy base-mesh bone layout to the current skeleton. This requires visual
+device validation; original skeletal clips do not imply exact recreation of the
+full original animation state machine or ragdoll behavior. The native asset
+checks compile the animator, validate skin data, and exercise run/fire/death/reset.
