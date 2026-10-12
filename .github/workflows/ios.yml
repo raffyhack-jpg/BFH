@@ -1,0 +1,29 @@
+name: Build unsigned iPhone IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "codex/pocketfront-ios"]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        run: bash scripts/build_unsigned.sh
+      - name: Save IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketFront-unsigned
+          path: build/PocketFront-unsigned.ipa
+          if-no-files-found: error
+      - name: Save logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: build/binary-info.txt
+          if-no-files-found: ignore
