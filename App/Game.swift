@@ -112,11 +112,21 @@ final class Game {
         switch mode {
         case .flags:
             let enemy=1-h.team
-            if flags[enemy].carrier == h.id { return flags[h.team].home }
+            if flags[enemy].carrier == h.id {
+                // Take a side lane home rather than returning through the main firefight.
+                if (h.team == 0 && h.p.x>6) || (h.team == 1 && h.p.x < -6) {
+                    return V2(x:0,z:h.id%2 == 0 ? 14 : -14)
+                }
+                return flags[h.team].home
+            }
             if let carrier=flags[h.team].carrier { return heroes[carrier].p }
             if flags[h.team].p.distance(flags[h.team].home)>1 { return flags[h.team].p }
             if let carrier=flags[enemy].carrier { return heroes[carrier].p + V2(x:0,z:Double(h.id%3)-1) }
             if h.id%3 == 1 { return flags[h.team].home + V2(x:h.team == 0 ? 5 : -5,z:Double(h.id%4)-2) }
+            // Send raiders around cover while defenders protect the home flag.
+            if (h.team == 0 && h.p.x < -8) || (h.team == 1 && h.p.x>8) {
+                return V2(x:0,z:h.id%2 == 0 ? 14 : -14)
+            }
             return flags[enemy].p
         case .conquest, .rocket:
             let candidates=objectives.filter { $0.owner != h.team }

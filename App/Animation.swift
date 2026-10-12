@@ -25,7 +25,7 @@ final class AnimatedCharacter {
     init(_ faction:String, directory:URL) throws {
         asset=try Self.load(faction,directory:directory)
         bones=asset.bones.map { b in let n=SCNNode(); n.name=b.name; return n }
-        visual.eulerAngles.y=Float.pi; node.addChildNode(visual)
+        visual.simdEulerAngles.y=Float.pi; node.addChildNode(visual)
         for (i,b) in asset.bones.enumerated() {
             let n=bones[i]; n.simdPosition=SIMD3(b.position[0],b.position[1],b.position[2])
             n.simdOrientation=simd_quatf(ix:b.rotation[0],iy:b.rotation[1],iz:b.rotation[2],r:b.rotation[3])
@@ -69,8 +69,8 @@ final class AnimatedCharacter {
     func update(_ dt:Double, position:V2, moving:Bool, firing:Bool, ability:Bool, alive:Bool) {
         clock+=dt
         if firing { fireUntil=clock+0.22 }; if ability { abilityUntil=clock+0.45 }
-        if !alive { deathTime+=dt; node.eulerAngles.z=Float(min(1,deathTime/0.5))*Float.pi/2; node.isHidden=deathTime>1.4; return }
-        deathTime=0; node.isHidden=false; node.eulerAngles.z=0
+        if !alive { deathTime+=dt; node.simdEulerAngles.z=Float(min(1,deathTime/0.5))*Float.pi/2; node.isHidden=deathTime>1.4; return }
+        deathTime=0; node.isHidden=false; node.simdEulerAngles.z=0
         let clip=asset.clips[moving ? "run" : "idle"]!
         let blend=Float(1-exp(-dt*16))
         for i in bones.indices {

@@ -41,6 +41,6 @@ for mode in Mode.allCases {
     }
     check(game.winner != nil,"Match never ends: \(mode)")
     check(game.heroes.contains{$0.kills>0},"Bots never fought: \(mode)")
-    print("Bots completed \(mode.rawValue): \(Int(game.elapsed))s, winner \(game.winner!)")
+    print("Bots completed \(mode.rawValue): \(Int(game.elapsed))s, winner \(game.winner!), score \(game.score)")
 }
 print("All core checks passed")
