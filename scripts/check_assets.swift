@@ -1,6 +1,8 @@
 import Foundation
 import SceneKit
 import simd
+import Darwin
+setbuf(stdout,nil)
 for name in ["royal", "national"] {
     let url=URL(fileURLWithPath:"Assets/Characters/\(name).dae")
     let scene=try SCNScene(url:url,options:nil)
@@ -20,7 +22,9 @@ for name in ["royal", "national"] {
 
 for faction in ["royal", "national"] {
     let directory=URL(fileURLWithPath:"Assets/Characters",isDirectory:true)
+    print("Building weighted skeleton: \(faction)")
     let actor=try AnimatedCharacter(faction,directory:directory)
+    print("Skin constructed: \(faction)")
     precondition(actor.bones.count==74,"Original skeleton missing bones")
     var count=0
     actor.node.enumerateChildNodes { n, _ in
@@ -30,10 +34,12 @@ for faction in ["royal", "national"] {
             precondition(skin.boneWeights.vectorCount==skin.baseGeometry?.sources(for:.vertex).first?.vectorCount,"Weights do not cover original vertices")
         }
     }
+    print("Skinned parts: \(count)")
     precondition(count==4,"Missing original character skin parts")
     let before=actor.bones[67].simdOrientation.vector
     for _ in 0..<10 { actor.update(1.0/30,position:.zero,moving:true,firing:false,ability:false,alive:true) }
     let after=actor.bones[67].simdOrientation.vector
+    print("Run leg motion: \(simd_length(before-after))")
     precondition(simd_length(before-after)>0.01,"Run animation did not move the leg")
     for bone in actor.bones { precondition(bone.simdPosition.x.isFinite && bone.simdOrientation.vector.w.isFinite,"Invalid pose") }
     actor.update(0.6,position:.zero,moving:false,firing:false,ability:false,alive:false)
