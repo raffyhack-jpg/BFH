@@ -18,7 +18,9 @@ innoextract --silent --output-dir build/original-client/extracted \
   --include app/mods/bfheroes/Objects/Weapons_client.zip \
   --include app/mods/bfheroes/Objects/Vehicles_client.zip \
   --include app/mods/bfheroes/Objects/Common_client.zip \
+  --include app/mods/bfheroes/Objects/Items_client.zip \
   --include app/mods/bfheroes/Common_client.zip \
+  --include app/mods/bfheroes/Menu_client.zip \
   build/original-client/setup.exe
 build/asset-python/bin/python tools/original/convert_world.py \
   build/original-client/extracted/app/mods/bfheroes Assets/OriginalWorld

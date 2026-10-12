@@ -43,20 +43,24 @@ def main():
     ap=argparse.ArgumentParser(); ap.add_argument('client'); ap.add_argument('output'); args=ap.parse_args()
     base=Path(args.client); out=Path(args.output); out.mkdir(parents=True,exist_ok=True)
     (out/'textures').mkdir(exist_ok=True); (out/'meshes').mkdir(exist_ok=True)
-    archives={name:Archive(base/f'Objects/{name}_client.zip') for name in ['StaticObjects','Vegitation','Weapons','Vehicles','Common']}
+    archives={name:Archive(base/f'Objects/{name}_client.zip') for name in ['StaticObjects','Vegitation','Weapons','Vehicles','Common','Items']}
     gamecommon=Archive(base/'Common_client.zip')
+    menu=Archive(base/'Menu_client.zip')
     server=Archive(base/'Objects/StaticObjects_server.zip')
     level=Archive(base/'Levels/heat/server.zip'); levelclient=Archive(base/'Levels/heat/client.zip')
     sources=[]; textures={}; meshes={}; failures=[]
     def record(archive,name,data):
         sources.append({'archive':str(archive.path.relative_to(base)),'entry':name,'sha256':hashlib.sha256(data).hexdigest()})
     def texture(archive,name):
-        name=name.replace('\\','/').lower().lstrip('/'); key=(str(archive.path),name)
-        if key in textures: return textures[key]
+        name=name.replace('\\','/').lower().lstrip('/')
         # Original references have a game-root prefix; archive paths do not.
         relative=name
-        for prefix in ['objects/staticobjects/','objects/vegitation/','objects/weapons/','objects/vehicles/','objects/common/','common/']:
-            if name.startswith(prefix): relative=name[len(prefix):]
+        if name.startswith('objects/'):
+            _,category,relative=name.split('/',2)
+            archive=next(a for key,a in archives.items() if key.lower()==category)
+        elif name.startswith('common/'): archive=gamecommon;relative=name[len('common/'):]
+        key=(str(archive.path),relative)
+        if key in textures: return textures[key]
         data=archive.read(relative); record(archive,relative,data)
         image=Image.open(io.BytesIO(data)).convert('RGBA')
         # Color-map alpha is often gloss, not transparency.
@@ -126,6 +130,9 @@ def main():
     sky=export_mesh(gamecommon,'sky/skydome/meshes/skydomevillage.staticmesh','original-sky')
     skytexture=texture(gamecommon,'common/textures/sky/sky_heat.dds')
     for part in meshes[sky]['parts']: part['texture']=skytexture
+    ui=out.parent/'UI';ui.mkdir(exist_ok=True)
+    for source,destination in [('External/FlashMenu/images/background/logo.png','logo.png'),('External/FlashMenu/images/background/bg_menu.png','menu.png')]:
+        data=menu.read(source);record(menu,source,data);(ui/destination).write_bytes(data)
     # Original terrain grid, 2 metres per sample. Reflect Z consistently with the meshes.
     heights=np.frombuffer(level.read('HeightmapPrimary.raw'),dtype='<u2').reshape(257,257).astype(float)*.0025
     heights=np.flipud(heights).copy(); (out/'height.bin').write_bytes(heights.astype('<f4').tobytes())

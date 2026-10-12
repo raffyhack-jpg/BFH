@@ -7,6 +7,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
     assert binary[:4] in [bytes.fromhex(s) for s in ['cffaedfe','feedfacf','cafebabe','bebafeca']], 'Not a Mach-O binary'
     assert not any('/_CodeSignature/' in n for n in z.namelist()), 'Signature found'
     assert info['CFBundlePackageType']=='APPL'
+    assert prefix+'Assets/UI/logo.png' in z.namelist() and prefix+'Assets/UI/menu.png' in z.namelist(), 'Original menu artwork missing'
     world=json.loads(z.read(prefix+'Assets/OriginalWorld/world.json'))
     assert len(world['instances'])>500 and len(world['weapons'])==6, 'Original world was not bundled'
     for mesh in world['meshAssets'].values():

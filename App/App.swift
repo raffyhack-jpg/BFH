@@ -157,13 +157,17 @@ final class GameController: UIViewController {
     func showMenu(resume:Bool=false,result:String?=nil) {
         menu?.removeFromSuperview(); let panel=UIView(frame:view.bounds); panel.backgroundColor=UIColor(red:0.05,green:0.10,blue:0.16,alpha:0.96); view.addSubview(panel); menu=panel
         for c in [left,right,fire,skill,pause] { c.isHidden=true }
-        if let path=Bundle.main.path(forResource:"bfh-original",ofType:"png",inDirectory:"Assets"), let image=UIImage(contentsOfFile:path) {
-            let artwork=UIImageView(image:image); artwork.contentMode = .scaleAspectFit; artwork.translatesAutoresizingMaskIntoConstraints=false; artwork.alpha=0.8; panel.addSubview(artwork)
-            NSLayoutConstraint.activate([artwork.leadingAnchor.constraint(equalTo:panel.safeAreaLayoutGuide.leadingAnchor,constant:8),artwork.centerYAnchor.constraint(equalTo:panel.centerYAnchor),artwork.widthAnchor.constraint(equalToConstant:74),artwork.heightAnchor.constraint(equalToConstant:222)])
+        if let path=Bundle.main.path(forResource:"menu",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path) {
+            let background=UIImageView(image:image);background.frame=panel.bounds;background.autoresizingMask=[.flexibleWidth,.flexibleHeight];background.contentMode = .scaleAspectFill;background.clipsToBounds=true;background.layer.contentsRect=CGRect(x:0,y:0,width:1,height:656.0/1024.0);panel.addSubview(background)
+            let shade=UIView(frame:panel.bounds);shade.autoresizingMask=[.flexibleWidth,.flexibleHeight];shade.backgroundColor=UIColor.black.withAlphaComponent(0.35);panel.addSubview(shade)
         }
         let stack=UIStackView(); stack.axis = .vertical; stack.spacing=14; stack.alignment = .fill; stack.translatesAutoresizingMaskIntoConstraints=false; panel.addSubview(stack)
         NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo:panel.centerXAnchor),stack.centerYAnchor.constraint(equalTo:panel.centerYAnchor),stack.widthAnchor.constraint(equalTo:panel.widthAnchor,multiplier:0.72)])
-        let title=UILabel(); title.text=result ?? "BATTLEFIELD HEROES"; title.textColor = .white; title.textAlignment = .center; title.font=UIFont.systemFont(ofSize:30,weight:.black); stack.addArrangedSubview(title)
+        if result == nil,let path=Bundle.main.path(forResource:"logo",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path) {
+            let logo=UIImageView(image:image);logo.contentMode = .scaleAspectFit;stack.addArrangedSubview(logo);logo.heightAnchor.constraint(equalToConstant:70).isActive=true
+        } else {
+            let title=UILabel();title.text=result ?? "BATTLEFIELD HEROES";title.textColor = .white;title.textAlignment = .center;title.font=UIFont.systemFont(ofSize:30,weight:.black);stack.addArrangedSubview(title)
+        }
         let subtitle=UILabel(); subtitle.text="ROYAL vs NATIONAL  •  ORIGINAL BFH ASSETS"; subtitle.textColor = .lightGray; subtitle.textAlignment = .center; subtitle.font=UIFont.systemFont(ofSize:13,weight:.semibold); stack.addArrangedSubview(subtitle)
         if resume {
             let button=UIButton(type:.system); style(button,"RESUME",blue); button.addAction(UIAction { [weak self] _ in self?.game?.paused=false; self?.menu?.removeFromSuperview(); self?.menu=nil; for c in [self?.left,self?.right,self?.fire,self?.skill,self?.pause] { c?.isHidden=false } },for:.touchUpInside); stack.addArrangedSubview(button); button.heightAnchor.constraint(equalToConstant:44).isActive=true

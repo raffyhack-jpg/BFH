@@ -15,6 +15,7 @@ permission; the MIT license covers original code only.
 - Original heat map terrain, town buildings, trees, props and original object placements.
 - Original Royal/National SMG, machine gun and sniper meshes and textures.
 - Original sky dome/sky texture, capture flags and flagpole geometry.
+- Original Flash menu logo and scenic backdrop, imported without redrawing.
 - Conquest: capture the map objectives, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
   dropped flags return after eighteen seconds.
