@@ -1,0 +1,52 @@
+{
+  "skeleton": "german_male_soldier/german_male_soldier.ske",
+  "clips": {
+    "idle": {
+      "path": "german_male_soldier/Animations/SMG/GMS_SMG_idle1.baf",
+      "sha256": "250f757cd5783e0eb9e5382c4ed02559054711d400c652f6772a9d20b9a45050"
+    },
+    "run": {
+      "path": "german_male_soldier/Animations/SMG/GMS_SMG_runForward.baf",
+      "sha256": "43e71a0e5220c6e25f55de8016b4952ed5248b7f4d3e12bd347ff352e5d32957"
+    },
+    "fire": {
+      "path": "german_male_soldier/Animations/SMG/GMS_SMG_standFire.baf",
+      "sha256": "d672ec96d3c7b709001ef334a5481307fbd381c80e62e6018635149952217ca7"
+    },
+    "locomotionRun": {
+      "path": "german_male_soldier/Animations/Common/runForward.baf",
+      "sha256": "7b44a072738063cdfa58e2754c406b6704a6fed9111f318abdf3e877a4ced90e"
+    },
+    "locomotionIdle": {
+      "path": "german_male_soldier/Animations/Common/stand.baf",
+      "sha256": "9e080102a47e0f3e7c7645ddf7916a2aa9a3c45f6ca50d0ea2d0199fd8dcd2aa"
+    },
+    "death": {
+      "path": "german_male_soldier/Animations/Common/standdie.baf",
+      "sha256": "160ae0ba48f2b75ced55762826b76d265f55b7e0935054f44bce76e0075a6cd3"
+    }
+  },
+  "legacyBoneRemapping": {
+    "16": 22,
+    "17": 23,
+    "18": 39,
+    "19": 24,
+    "20": 38,
+    "21": 25,
+    "34": 40,
+    "35": 41,
+    "36": 57,
+    "37": 42,
+    "38": 56,
+    "39": 43,
+    "52": 66,
+    "53": 67,
+    "54": 68,
+    "55": 69,
+    "56": 70,
+    "57": 71,
+    "58": 72,
+    "59": 73
+  },
+  "coordinateConversion": "Reflect Z; inverse-bind matrices transposed from original row-vector storage. Max two original bone influences per vertex."
+}

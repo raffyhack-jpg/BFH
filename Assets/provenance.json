@@ -1,0 +1,13 @@
+{
+  "source": "https://archive.org/details/battlefield-heroes-setup",
+  "archive": "Battlefield Heroes Setup.rar",
+  "archive_size": 1203733068,
+  "archive_sha1": "7b77439053f6e79ebf5a9020b22aff85e49195e6",
+  "installer_version": "1.105",
+  "extracted_file": "app/bfh.bmp",
+  "output": "Assets/bfh-original.png",
+  "output_sha256": "3e13b7e0846a08c075770f616dafc5175105373828d2a731406a8be58524ac2e",
+  "conversion": "Lossless BMP to PNG, original 100x300 pixels",
+  "permission": "User stated permission to use original assets in this conversation. This is not independent verification.",
+  "status": "Installer artwork only. No original game meshes or map assets integrated."
+}

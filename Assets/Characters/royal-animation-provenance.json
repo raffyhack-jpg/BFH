@@ -1,0 +1,56 @@
+{
+  "skeleton": "british_male_soldier/british_male_soldier.ske",
+  "clips": {
+    "idle": {
+      "path": "british_male_soldier/Animations/SMG/BMS_SMG_idle1.baf",
+      "sha256": "667af6732b6d8640b93e042b4fcdae11ad0b38e5acc241f990449be90cf9b97b"
+    },
+    "run": {
+      "path": "british_male_soldier/Animations/SMG/BMS_SMG_runForward.baf",
+      "sha256": "9721ccdf6a275b036cd5eda07ecab1fa18e43b07710c1d96860bb4d096a5e8a8"
+    },
+    "fire": {
+      "path": "british_male_soldier/Animations/SMG/BMS_SMG_standFire.baf",
+      "sha256": "f460ef4e1256614ae8afeaad22f90b744101a1300471ad7db9b79ce1927aafa9"
+    },
+    "ability": {
+      "path": "british_male_soldier/Animations/Abilities/BMS_Ability_Tonic.baf",
+      "sha256": "7e0fbbcec8baf57de490c4f52cb9a1f33da8ef6b8bebcfd10b56bfe92c64524f"
+    },
+    "locomotionRun": {
+      "path": "british_male_soldier/Animations/Common/runForward.baf",
+      "sha256": "54240ed239e9801469dbf70ccaaeb091a884e374aad2affd8cd0137ea5d9e2b4"
+    },
+    "locomotionIdle": {
+      "path": "british_male_soldier/Animations/Common/stand.baf",
+      "sha256": "1160122e144c61c1e2255de028e0f857cddc2104c887c2b5ca9fd8a81429469d"
+    },
+    "death": {
+      "path": "british_male_soldier/Animations/Common/standdie.baf",
+      "sha256": "2911c5e9576f73e58f6cb6b5d0ac4d27aea70bf02e3ccc8c0d6d9945f7d44b92"
+    }
+  },
+  "legacyBoneRemapping": {
+    "16": 22,
+    "17": 23,
+    "18": 39,
+    "19": 24,
+    "20": 38,
+    "21": 25,
+    "34": 40,
+    "35": 41,
+    "36": 57,
+    "37": 42,
+    "38": 56,
+    "39": 43,
+    "52": 66,
+    "53": 67,
+    "54": 68,
+    "55": 69,
+    "56": 70,
+    "57": 71,
+    "58": 72,
+    "59": 73
+  },
+  "coordinateConversion": "Reflect Z; inverse-bind matrices transposed from original row-vector storage. Max two original bone influences per vertex."
+}

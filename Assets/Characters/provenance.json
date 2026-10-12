@@ -1,0 +1,20 @@
+{
+  "source_archive_sha1": "7b77439053f6e79ebf5a9020b22aff85e49195e6",
+  "client_version": "1.105",
+  "conversion": "Original base character meshes and uniform textures converted to static COLLADA. Bone weights and animations are not exported. Default cosmetic 001 meshes contained no textured renderable materials and were omitted.",
+  "reader": "https://github.com/marekzajac97/bf2-blender",
+  "assets": [
+    {
+      "faction": "royal",
+      "source_mesh": "british_male_soldier/meshes/british_male_soldier.skinnedmesh",
+      "sha256": "6f9eca3ae079456911310dcfdd768df5d1317aa6f4ca15723158d6cbbfc50fca",
+      "static_pose": true
+    },
+    {
+      "faction": "national",
+      "source_mesh": "german_male_soldier/meshes/german_male_soldier.skinnedmesh",
+      "sha256": "845d6a1a492c68e1bbea1108ddfa544b7caa5df5637c7a1491b1a72a2c2bf091",
+      "static_pose": true
+    }
+  ]
+}

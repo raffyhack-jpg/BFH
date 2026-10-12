@@ -1,0 +1,26 @@
+name: Build unsigned iPhone IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "codex/pocketfront-ios"]
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate original meshes and skeletal playback
+        run: bash scripts/check_animation.sh
+      - name: Build and test
+        run: bash scripts/build_unsigned.sh
+      - name: Save IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketFront-unsigned
+          path: build/PocketFront-unsigned.ipa
+          if-no-files-found: error

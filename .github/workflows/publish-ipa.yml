@@ -1,0 +1,28 @@
+name: Publish unsigned iPhone prototype
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: macos-15
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate original character assets
+        run: bash scripts/check_animation.sh
+      - name: Build and test
+        run: bash scripts/build_unsigned.sh
+      - name: Attach IPA to private prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="prototype-${GITHUB_SHA:0:12}"
+          gh release create "$tag" build/PocketFront-unsigned.ipa \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "iPhone prototype ${GITHUB_SHA:0:12}" \
+            --notes "Unsigned ARM64 iPhone prototype. SceneKit import, game-core checks and Xcode build passed. Requires device signing. Original faction models use original weighted skeletal animation. Original maps, weapons and full gameplay fidelity remain unfinished."
