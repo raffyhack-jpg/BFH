@@ -70,9 +70,6 @@ final class GameController: UIViewController {
         hud.frame=CGRect(x:r.left+80,y:r.top+14,width:w-r.left-r.right-160,height:48); notice.frame=CGRect(x:100,y:h*0.24,width:w-200,height:45)
         menu?.frame=view.bounds
     }
-    func box(_ w:CGFloat,_ h:CGFloat,_ l:CGFloat,_ color:UIColor) -> SCNNode {
-        let g=SCNBox(width:w,height:h,length:l,chamferRadius:0.08); g.firstMaterial?.diffuse.contents=color; g.firstMaterial?.roughness.contents=0.95; return SCNNode(geometry:g)
-    }
     func sphere(_ radius:CGFloat,_ color:UIColor) -> SCNNode { let g=SCNSphere(radius:radius); g.segmentCount=10; g.firstMaterial?.diffuse.contents=color; return SCNNode(geometry:g) }
     func soldier(_ kind:HeroClass,_ team:Int) throws -> SCNNode {
         guard let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Characters"),let original=originalWorld else { throw CocoaError(.fileReadNoSuchFile) }

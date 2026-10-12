@@ -150,7 +150,10 @@ def main():
     vo=struct.pack('<'+'f'*len(vertices),*vertices);io_=struct.pack('<'+'I'*len(indices),*indices)
     (out/'meshes/terrain.bin').write_bytes(vo+io_)
     meshes['terrain']={'file':'meshes/terrain.bin','parts':[{'vertexOffset':0,'vertexCount':66049,'indexOffset':len(vo),'indexCount':len(indices),'texture':'terrain.png','alpha':False}],'min':[-256,float(heights.min()),-256],'max':[256,float(heights.max()),256]}
-    world={'name':'Original BFH heat map','meshAssets':meshes,'instances':instances,'weapons':weapons,'flags':flags,'sky':sky,'blocks':collision,'bases':[[78.722,105.957],[-72.195,-73.048]],'objectives':[[23.605,100.373],[-22.951,71.919],[29.226,-36.392]],'size':257,'spacing':2,'origin':-256,'waterHeight':19,'heightFile':'height.bin'}
+    gameplay=level.read('GameModes/gpm_tdm/16/GamePlayObjects.con');record(level,'GameModes/gpm_tdm/16/GamePlayObjects.con',gameplay)
+    controlpoints={p['name']:p['position'] for p in placements(gameplay.decode('latin1'))}
+    objectives=[[controlpoints[n][0],-controlpoints[n][2]] for n in ['market','boulevard','toll_house','square']]
+    world={'name':'Original BFH heat map','meshAssets':meshes,'instances':instances,'weapons':weapons,'flags':flags,'sky':sky,'blocks':collision,'bases':[[78.722,105.957],[-72.195,-73.048]],'objectives':objectives,'size':257,'spacing':2,'origin':-256,'waterHeight':19,'heightFile':'height.bin'}
     (out/'world.json').write_text(json.dumps(world,separators=(',',':')))
     (out/'provenance.json').write_text(json.dumps({'source':'https://archive.org/details/battlefield-heroes-setup','archiveSHA1':'7b77439053f6e79ebf5a9020b22aff85e49195e6','clientVersion':'1.105','reader':'https://github.com/marekzajac97/bf2-blender','convertedSources':sources,'unresolvedObjects':sorted(set(failures))},indent=2))
     print(f'Converted {len(instances)} original placements, {len(meshes)} meshes, {len(textures)} textures and {len(weapons)} weapons; unresolved: {sorted(set(failures))}')

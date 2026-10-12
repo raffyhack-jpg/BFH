@@ -2,6 +2,8 @@ import Foundation
 import SceneKit
 import simd
 import Darwin
+import Metal
+import AppKit
 setbuf(stdout,nil)
 for name in ["royal", "national"] {
     let url=URL(fileURLWithPath:"Assets/Characters/\(name).dae")
@@ -34,6 +36,26 @@ for objective in mapGame.objectives {
     for base in mapGame.bases { precondition(!mapGame.route(base,objective.p).isEmpty,"Bots cannot reach an objective on original terrain") }
 }
 print("Validated original map: \(original.map.instances.count) placements, six weapons, terrain sampling and connected objective routes")
+if let device=MTLCreateSystemDefaultDevice() {
+    let preview=SCNScene();preview.rootNode.addChildNode(world)
+    preview.background.contents=NSColor(red:0.56,green:0.68,blue:0.67,alpha:1)
+    let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=650;preview.rootNode.addChildNode(ambient)
+    let sun=SCNNode();sun.light=SCNLight();sun.light?.type = .directional;sun.light?.intensity=1100;sun.eulerAngles=SCNVector3(-0.9,-0.6,0);preview.rootNode.addChildNode(sun)
+    let player=try AnimatedCharacter("royal",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
+    let spawn=mapGame.bases[0],toward=(mapGame.objectives[0].p-spawn).unit
+    player.node.position=SCNVector3(Float(spawn.x),original.height(spawn),Float(spawn.z));player.node.eulerAngles.y=Float(atan2(toward.x,toward.z))
+    player.bones[44].addChildNode(try original.weapon(.soldier,0));preview.rootNode.addChildNode(player.node)
+    let camera=SCNNode();camera.camera=SCNCamera();camera.camera?.fieldOfView=68;camera.camera?.zFar=600
+    camera.position=SCNVector3(Float(spawn.x-toward.x*5.5),original.height(spawn)+3.4,Float(spawn.z-toward.z*5.5))
+    camera.look(at:SCNVector3(Float(spawn.x+toward.x*12),original.height(spawn)+1.5,Float(spawn.z+toward.z*12)))
+    preview.rootNode.addChildNode(camera);let sky=try original.sky();sky.position=camera.position;preview.rootNode.addChildNode(sky)
+    let renderer=SCNRenderer(device:device,options:nil);renderer.scene=preview;renderer.pointOfView=camera
+    let image=renderer.snapshot(atTime:0,with:CGSize(width:1280,height:720),antialiasingMode:.multisampling4X)
+    if let tiff=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:tiff),let png=bitmap.representation(using:.png,properties:[:]) {
+        try png.write(to:URL(fileURLWithPath:"build/original-map-preview.png"))
+        print("Rendered original-map asset preview, 1280x720")
+    }
+} else { print("No Metal device on runner: visual snapshot skipped; device playtest still required") }
 
 for faction in ["royal", "national"] {
     let directory=URL(fileURLWithPath:"Assets/Characters",isDirectory:true)

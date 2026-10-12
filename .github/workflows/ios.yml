@@ -14,8 +14,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Restore verified original client archive
+        uses: actions/cache/restore@v4
+        with:
+          path: build/original-client/client.rar
+          key: bfh-client-7b77439053f6e79ebf5a9020b22aff85e49195e6
       - name: Recover and convert original map and weapon assets
         run: bash scripts/prepare_original_assets.sh
+      - name: Cache verified original client archive
+        uses: actions/cache/save@v4
+        with:
+          path: build/original-client/client.rar
+          key: bfh-client-7b77439053f6e79ebf5a9020b22aff85e49195e6
       - name: Validate original meshes and skeletal playback
         run: bash scripts/check_animation.sh
       - name: Build and test

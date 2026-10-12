@@ -9,13 +9,13 @@ permission; the MIT license covers original code only.
 ## Included
 
 - Native Swift/UIKit/SceneKit app for landscape iPhone, iOS 15+.
-- Offline 6v6: one player and eleven bots, three classes (Soldier, Gunner, Commando).
+- Offline 8v8: one player and fifteen bots, three classes (Soldier, Gunner, Commando).
 - Original Royal/National base models: 2,406 vertices and 2,286 triangles per
   faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire/death clips.
 - Original heat map terrain, town buildings, trees, props and original object placements.
 - Original Royal/National SMG, machine gun and sniper meshes and textures.
 - Original sky dome/sky texture, capture flags and flagpole geometry.
-- Conquest: capture three points, drain enemy tickets, respawn.
+- Conquest: capture the map objectives, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
   dropped flags return after eighteen seconds.
 - Elimination: no respawn; eliminate the enemy squad.

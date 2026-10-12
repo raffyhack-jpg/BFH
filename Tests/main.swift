@@ -9,7 +9,7 @@ conquest.heroes.forEach { $0.think=1000 }
 for _ in 0..<100 { conquest.update(0.05) }
 check(conquest.objectives[1].owner == 0,"Uncontested capture failed")
 check(conquest.tickets[1]<70,"Owned points must drain tickets")
-let victim=conquest.heroes[6], attacker=conquest.heroes[0]
+let victim=conquest.heroes.first{$0.team == 1}!, attacker=conquest.heroes[0]
 victim.invulnerable=0; conquest.hurt(victim,1000,attacker:attacker)
 check(!victim.alive && attacker.kills == 1 && victim.deaths == 1,"Kill attribution failed")
 for _ in 0..<90 { conquest.update(0.05) }

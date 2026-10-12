@@ -78,10 +78,10 @@ final class Game {
         for i in bases.indices { bases[i]=nearestFree(bases[i]) }
         for i in objectives.indices { objectives[i].p=nearestFree(objectives[i].p) }
         flags = [Flag(home:bases[0],p:bases[0]),Flag(home:bases[1],p:bases[1])]
-        for i in 0..<12 {
-            let team = i < 6 ? 0 : 1
+        for i in 0..<16 {
+            let team = i < 8 ? 0 : 1
             let kind = i == 0 ? hero : HeroClass.allCases[i%3]
-            heroes.append(Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%6)-2.5))))
+            heroes.append(Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%8)-3.5))))
         }
     }
     func free(_ p: V2) -> Bool {
@@ -255,7 +255,7 @@ final class Game {
             if !h.alive {
                 h.respawn-=dt
                 if h.respawn<=0 && mode != .elimination {
-                    h.hp=h.kind.hp; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%6)-2.5)); h.invulnerable=2; h.path=[]
+                    h.hp=h.kind.hp; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[]
                 }
                 continue
             }

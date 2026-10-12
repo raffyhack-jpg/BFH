@@ -13,8 +13,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Restore verified original client archive
+        uses: actions/cache/restore@v4
+        with:
+          path: build/original-client/client.rar
+          key: bfh-client-7b77439053f6e79ebf5a9020b22aff85e49195e6
       - name: Recover and convert original map and weapon assets
         run: bash scripts/prepare_original_assets.sh
+      - name: Cache verified original client archive
+        uses: actions/cache/save@v4
+        with:
+          path: build/original-client/client.rar
+          key: bfh-client-7b77439053f6e79ebf5a9020b22aff85e49195e6
       - name: Validate original character assets
         run: bash scripts/check_animation.sh
       - name: Build and test
@@ -24,7 +34,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="prototype-${GITHUB_SHA:0:12}"
-          gh release create "$tag" build/PocketFront-unsigned.ipa \
+          files=(build/PocketFront-unsigned.ipa)
+          if [ -f build/original-map-preview.png ]; then files+=(build/original-map-preview.png); fi
+          gh release create "$tag" "${files[@]}" \
             --target "$GITHUB_SHA" --prerelease \
             --title "iPhone prototype ${GITHUB_SHA:0:12}" \
             --notes "Unsigned ARM64 iPhone prototype. SceneKit import, game-core checks and Xcode build passed. Requires device signing. Original faction models use original weighted skeletal animation. Original heat map terrain, buildings, placements, textures and six faction weapons are converted from the verified original client. Gameplay fidelity and the rest of the maps and vehicles remain unfinished."

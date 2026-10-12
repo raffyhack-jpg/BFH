@@ -6,9 +6,9 @@ if ! command -v innoextract >/dev/null; then brew install innoextract; fi
 python3 -m venv build/asset-python
 build/asset-python/bin/pip -q install numpy Pillow
 source_archive="build/original-client/client.rar"
-curl --fail --location --retry 3 \
-  'https://archive.org/download/battlefield-heroes-setup/Battlefield%20Heroes%20Setup.rar' \
-  --output "$source_archive"
+if [ ! -f "$source_archive" ]; then
+  python3 tools/original/fetch_original.py "$source_archive"
+fi
 python3 tools/original/recover_installer.py "$source_archive" build/original-client
 innoextract --silent --output-dir build/original-client/extracted \
   --include app/mods/bfheroes/Levels/heat \
