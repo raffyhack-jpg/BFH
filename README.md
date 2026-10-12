@@ -102,3 +102,19 @@ The full client has not been downloaded, and original 3D models/animations have
 not been converted or integrated. The preserved installer file list is included
 as `Assets/installer-file-list.txt`.
 
+
+## Original characters integrated
+
+The complete preserved installer archive was downloaded and its Internet Archive
+SHA-1 was verified (`7b77439053f6e79ebf5a9020b22aff85e49195e6`). Original Royal
+and National base character geometry (2,406 vertices / 2,286 triangles each) and
+1024px uniform textures were converted to COLLADA/PNG and connected to the native
+character renderer. They use static bind poses; original skeletal animation,
+cosmetics, original weapons and maps remain unfinished. Provenance is recorded in
+`Assets/Characters/provenance.json`. The asset validator checks SceneKit loading
+and geometry on macOS CI. Device appearance and controls still need playtesting.
+
+The first macOS CI build compiled successfully, passed all game-core checks,
+and verified a real unsigned ARM64 IPA. Artifact upload failed because the
+account's Actions storage quota was full. Private-release delivery requires an
+approved change granting the publishing job repository contents-write access.

@@ -72,7 +72,24 @@ final class GameController: UIViewController {
         let g=SCNBox(width:w,height:h,length:l,chamferRadius:0.08); g.firstMaterial?.diffuse.contents=color; g.firstMaterial?.roughness.contents=0.95; return SCNNode(geometry:g)
     }
     func sphere(_ radius:CGFloat,_ color:UIColor) -> SCNNode { let g=SCNSphere(radius:radius); g.segmentCount=10; g.firstMaterial?.diffuse.contents=color; return SCNNode(geometry:g) }
+    var characterTemplates: [Int:SCNNode] = [:]
     func soldier(_ kind:HeroClass,_ team:Int) -> SCNNode {
+        let faction=team == 0 ? "royal" : "national"
+        if characterTemplates[team] == nil,
+           let url=Bundle.main.url(forResource:faction,withExtension:"dae",subdirectory:"Assets/Characters"),
+           let imported=try? SCNScene(url:url,options:nil) {
+            characterTemplates[team]=imported.rootNode
+        }
+        if let template=characterTemplates[team] {
+            let root=SCNNode()
+            for child in template.childNodes { root.addChildNode(child.clone()) }
+            let marker=sphere(0.1,team == 0 ? blue : red); marker.position.y=2.3; root.addChildNode(marker)
+            let gun=box(0.16,0.16,kind == .scout ? 1.3 : 0.85,UIColor(white:0.2,alpha:1)); gun.position=SCNVector3(0.4,1.15,0.65); root.addChildNode(gun)
+            return root
+        }
+        return placeholderSoldier(kind,team)
+    }
+    func placeholderSoldier(_ kind:HeroClass,_ team:Int) -> SCNNode {
         let root=SCNNode(), color=team == 0 ? blue : red
         let torso=box(kind == .heavy ? 0.9 : 0.65,0.8,0.5,color); torso.position.y=1.05; root.addChildNode(torso)
         let head=sphere(0.28,UIColor(red:0.96,green:0.76,blue:0.52,alpha:1)); head.position.y=1.73; root.addChildNode(head)

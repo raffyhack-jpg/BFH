@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Validate original character assets
+        run: swift scripts/check_assets.swift
       - name: Build and test
         run: bash scripts/build_unsigned.sh
       - name: Save IPA
@@ -22,10 +24,3 @@ jobs:
           name: PocketFront-unsigned
           path: build/PocketFront-unsigned.ipa
           if-no-files-found: error
-      - name: Save logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-info
-          path: build/binary-info.txt
-          if-no-files-found: ignore
