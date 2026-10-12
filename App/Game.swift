@@ -77,8 +77,9 @@ final class Game {
     }
     func move(_ h: Hero, _ direction: V2, _ dt: Double) {
         let d=direction.unit * (h.kind.speed*dt)
-        let x=V2(x:h.p.x+d.x,z:h.p.z), z=V2(x:h.p.x,z:h.p.z+d.z)
+        let x=V2(x:h.p.x+d.x,z:h.p.z)
         if free(x) { h.p.x=x.x }
+        let z=V2(x:h.p.x,z:h.p.z+d.z)
         if free(z) { h.p.z=z.z }
     }
     // Grid A*: deterministic, small bounded arena; collision footprint matches movement.

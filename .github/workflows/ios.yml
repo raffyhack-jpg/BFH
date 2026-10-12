@@ -3,7 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, "codex/pocketfront-ios"]
-  pull_request:
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
