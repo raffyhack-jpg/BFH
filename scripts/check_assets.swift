@@ -42,9 +42,10 @@ for faction in ["royal", "national"] {
     print("Run leg motion: \(simd_length(before-after))")
     precondition(simd_length(before-after)>0.01,"Run animation did not move the leg")
     for bone in actor.bones { precondition(bone.simdPosition.x.isFinite && bone.simdOrientation.vector.w.isFinite,"Invalid pose") }
-    actor.update(0.6,position:.zero,moving:false,firing:false,ability:false,alive:false)
-    precondition(abs(actor.node.eulerAngles.z)>1,"Death transition did not run")
+    let liveHip=actor.bones[1].simdPosition
+    for _ in 0..<24 { actor.update(1.0/30,position:.zero,moving:false,firing:false,ability:false,alive:false) }
+    precondition(actor.asset.clips["death"] != nil && simd_length(actor.bones[1].simdPosition-liveHip)>0.01,"Original death animation did not change the pose")
     actor.update(0.05,position:.zero,moving:false,firing:true,ability:false,alive:true)
-    precondition(!actor.node.isHidden && actor.node.eulerAngles.z==0,"Respawn did not reset pose")
+    precondition(!actor.node.isHidden && actor.deathTime==0,"Respawn did not reset pose")
     print("Validated original \(faction): 74-bone skin, run/fire playback, death/respawn")
 }

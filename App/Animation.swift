@@ -57,10 +57,11 @@ final class AnimatedCharacter {
             SIMD4(f[8],f[9],f[10],f[11]), SIMD4(f[12],f[13],f[14],f[15])
         )))
     }
-    func sample(_ clip:RigClip, bone:Int, time:Double) -> (SIMD3<Float>,simd_quatf)? {
+    func sample(_ clip:RigClip, bone:Int, time:Double, looping:Bool=true) -> (SIMD3<Float>,simd_quatf)? {
         guard let track=clip.tracks[String(bone)], !track.isEmpty else { return nil }
         let frame=Float(time)*clip.fps
-        let i=track.count==1 ? 0 : Int(frame)%track.count, j=track.count==1 ? 0 : (i+1)%track.count
+        let i=track.count==1 ? 0 : looping ? Int(frame)%track.count : min(track.count-1,Int(frame))
+        let j=track.count==1 ? 0 : looping ? (i+1)%track.count : min(track.count-1,i+1)
         let a=track[i], b=track[j], t=track.count==1 ? 0 : frame-floor(frame)
         let p=simd_mix(SIMD3(a[0],a[1],a[2]),SIMD3(b[0],b[1],b[2]),SIMD3(repeating:t))
         let q=simd_slerp(simd_normalize(simd_quatf(ix:a[3],iy:a[4],iz:a[5],r:a[6])),simd_normalize(simd_quatf(ix:b[3],iy:b[4],iz:b[5],r:b[6])),t)
@@ -69,19 +70,23 @@ final class AnimatedCharacter {
     func update(_ dt:Double, position:V2, moving:Bool, firing:Bool, ability:Bool, alive:Bool) {
         clock+=dt
         if firing { fireUntil=clock+0.22 }; if ability { abilityUntil=clock+0.45 }
-        if !alive { deathTime+=dt; node.simdEulerAngles.z=Float(min(1,deathTime/0.5))*Float.pi/2; node.isHidden=deathTime>1.4; return }
-        deathTime=0; node.isHidden=false; node.simdEulerAngles.z=0
+        if !alive { deathTime+=dt } else { deathTime=0 }
+        let death=asset.clips["death"]
+        node.isHidden = !alive && deathTime>Double(death?.frames ?? 45)/Double(death?.fps ?? 30)+0.5
         let clip=asset.clips[moving ? "run" : "idle"]!
+        let lower=asset.clips[moving ? "locomotionRun" : "locomotionIdle"]
         let blend=Float(1-exp(-dt*16))
         for i in bones.indices {
             let bind=asset.bones[i]
             var p=SIMD3(bind.position[0],bind.position[1],bind.position[2])
             var q=simd_quatf(ix:bind.rotation[0],iy:bind.rotation[1],iz:bind.rotation[2],r:bind.rotation[3])
             if let pose=sample(clip,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if (i<2 || i>=66), let lower=lower, let pose=sample(lower,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if !alive, let death=death, let pose=sample(death,bone:i,time:deathTime,looping:false) { p=pose.0; q=pose.1 }
             // Preserve the locomotion legs while layering the original upper-body fire clip.
-            if i>=2 && i<=57, clock<fireUntil, let fire=asset.clips["fire"], let pose=sample(fire,bone:i,time:clock) { p=pose.0; q=pose.1 }
-            if i>=2 && i<=57, clock<abilityUntil, let skill=asset.clips["ability"], let pose=sample(skill,bone:i,time:clock) { p=pose.0; q=pose.1 }
-            if i==0 { p.x=0; p.z=0 }
+            if alive, i>=2 && i<=57, clock<fireUntil, let fire=asset.clips["fire"], let pose=sample(fire,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if alive, i>=2 && i<=57, clock<abilityUntil, let skill=asset.clips["ability"], let pose=sample(skill,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if i==0 && alive { p.x=0; p.z=0 }
             bones[i].simdPosition=simd_mix(bones[i].simdPosition,p,SIMD3(repeating:blend))
             bones[i].simdOrientation=simd_slerp(bones[i].simdOrientation,q,blend)
         }

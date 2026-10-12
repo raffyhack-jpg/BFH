@@ -12,6 +12,18 @@
     "fire": {
       "path": "german_male_soldier/Animations/SMG/GMS_SMG_standFire.baf",
       "sha256": "d672ec96d3c7b709001ef334a5481307fbd381c80e62e6018635149952217ca7"
+    },
+    "locomotionRun": {
+      "path": "german_male_soldier/Animations/Common/runForward.baf",
+      "sha256": "7b44a072738063cdfa58e2754c406b6704a6fed9111f318abdf3e877a4ced90e"
+    },
+    "locomotionIdle": {
+      "path": "german_male_soldier/Animations/Common/stand.baf",
+      "sha256": "9e080102a47e0f3e7c7645ddf7916a2aa9a3c45f6ca50d0ea2d0199fd8dcd2aa"
+    },
+    "death": {
+      "path": "german_male_soldier/Animations/Common/standdie.baf",
+      "sha256": "160ae0ba48f2b75ced55762826b76d265f55b7e0935054f44bce76e0075a6cd3"
     }
   },
   "legacyBoneRemapping": {

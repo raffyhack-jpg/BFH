@@ -11,7 +11,7 @@ permission; the MIT license covers original code only.
 - Native Swift/UIKit/SceneKit app for landscape iPhone, iOS 15+.
 - Offline 6v6: one player and eleven bots, three classes (Soldier, Heavy, Scout).
 - Original Royal/National base models: 2,406 vertices and 2,286 triangles per
-  faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire clips.
+  faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire/death clips.
 - One compact original arena with cover, buildings, trees, and simple weapons.
 - Conquest: capture three points, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
@@ -101,11 +101,11 @@ from the MIT license.
 
 `App/Animation.swift` builds GPU-skinned character geometry from the original
 vertex weights and inverse-bind matrices, uses the 74-bone original skeletons,
-and decodes original idle, running, and firing animation tracks. Firing layers
+and decodes original idle, running, firing, and death animation tracks. Firing layers
 over locomotion on the upper body. Royal tonic animation is included when
 available; the National variant currently has no converted ability clip. Pose
 transitions blend, root translation is removed so gameplay movement controls
-position, and death/respawn use a procedural fall/reset. A mapping translates
+position, and death uses the original Common death clip before respawning resets playback. A mapping translates
 the legacy base-mesh bone layout to the current skeleton. This requires visual
 device validation; original skeletal clips do not imply exact recreation of the
 full original animation state machine or ragdoll behavior. The native asset
