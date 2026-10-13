@@ -118,7 +118,7 @@ extension HeroClass {
 final class OriginalWardrobe {
     let directory:URL,catalog:WardrobeCatalog
     let byID:[Int:ClothingItem],weapons:[Int:WardrobeWeapon]
-    var meshCache:[String:[RigPart]]=[:],imageCache:[String:CGImage]=[:]
+    var meshCache:[String:[RigPart]]=[:],imageCache:[String:CGImage]=[:];var imageBytes=0
     init(directory:URL) throws {
         self.directory=directory;catalog=try JSONDecoder().decode(WardrobeCatalog.self,from:Data(contentsOf:directory.appendingPathComponent("catalog.json")))
         byID=Dictionary(catalog.items.map{($0.id,$0)},uniquingKeysWith:{$1});weapons=Dictionary(catalog.weapons.map{($0.id,$0)},uniquingKeysWith:{$1})
@@ -141,7 +141,7 @@ final class OriginalWardrobe {
     func image(_ file:String)->CGImage? {
         if let image=imageCache[file] { return image }
         guard let source=CGImageSourceCreateWithURL(directory.appendingPathComponent(file) as CFURL,nil),let image=CGImageSourceCreateImageAtIndex(source,0,nil) else { return nil }
-        if imageCache.count>64 { imageCache.removeAll() };imageCache[file]=image;return image
+        let cost=image.bytesPerRow*image.height;if imageBytes+cost>48*1024*1024 { imageCache.removeAll();imageBytes=0 };imageCache[file]=image;imageBytes+=cost;return image
     }
     func parts(_ file:String)throws->[RigPart] {
         if let cached=meshCache[file] { return cached }

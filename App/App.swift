@@ -270,7 +270,7 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
     var finished:((Int,HeroClass)->Void)?
     let preview=SCNView(),previewScene=SCNScene(),previewCamera=SCNNode(),heroRoot=SCNNode()
     var actor:AnimatedCharacter?,clock=0.0,last=0.0,link:CADisplayLink?,rotation:Float=0
-    let title=UILabel(),factions=UISegmentedControl(items:["ROYAL","NATIONAL"]),classes=UISegmentedControl(items:["COMMANDO","SOLDIER","GUNNER"])
+    let heroTitle=UILabel(),factions=UISegmentedControl(items:["ROYAL","NATIONAL"]),classes=UISegmentedControl(items:["COMMANDO","SOLDIER","GUNNER"])
     let categoryScroll=UIScrollView(),categoryStack=UIStackView(),search=UISearchBar(),status=UILabel(),close=UIButton(type:.system),reset=UIButton(type:.system)
     let slots=UISegmentedControl(items:["WEAPON 1","WEAPON 2"])
     let collection:UICollectionView
@@ -290,8 +290,8 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
             let background=UIImageView(image:image);background.frame=view.bounds;background.autoresizingMask=[.flexibleWidth,.flexibleHeight];background.contentMode = .scaleAspectFill;background.layer.contentsRect=CGRect(x:0,y:0,width:1,height:656.0/1024);view.addSubview(background)
             let shade=UIView(frame:view.bounds);shade.backgroundColor=UIColor.black.withAlphaComponent(0.65);shade.autoresizingMask=[.flexibleWidth,.flexibleHeight];view.addSubview(shade)
         }
-        title.text="MY HERO";title.textColor = .white;title.font=UIFont.systemFont(ofSize:23,weight:.black)
-        for v in [preview,title,factions,classes,categoryScroll,collection,search,status,close,reset,slots] {view.addSubview(v)}
+        heroTitle.text="MY HERO";heroTitle.textColor = .white;heroTitle.font=UIFont.systemFont(ofSize:23,weight:.black)
+        for v in [preview,heroTitle,factions,classes,categoryScroll,collection,search,status,close,reset,slots] {view.addSubview(v)}
         preview.scene=previewScene;preview.backgroundColor = .clear;preview.antialiasingMode = .multisampling4X;preview.isPlaying=true;preview.pointOfView=previewCamera
         previewScene.rootNode.addChildNode(heroRoot);previewCamera.camera=SCNCamera();previewCamera.camera?.fieldOfView=36;previewCamera.position=SCNVector3(0,1.2,4.7);previewCamera.look(at:SCNVector3(0,1.1,0));previewScene.rootNode.addChildNode(previewCamera)
         let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=900;previewScene.rootNode.addChildNode(ambient)
@@ -319,7 +319,7 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
     override func viewDidDisappear(_ animated:Bool) {super.viewDidDisappear(animated);link?.invalidate();link=nil}
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews();let safe=view.safeAreaInsets,w=view.bounds.width-safe.left-safe.right,h=view.bounds.height-safe.top-safe.bottom,x=safe.left
-        title.frame=CGRect(x:x+18,y:safe.top+8,width:w*0.3,height:30);close.frame=CGRect(x:x+w-142,y:safe.top+6,width:130,height:34)
+        heroTitle.frame=CGRect(x:x+18,y:safe.top+8,width:w*0.3,height:30);close.frame=CGRect(x:x+w-142,y:safe.top+6,width:130,height:34)
         factions.frame=CGRect(x:x+14,y:safe.top+45,width:w*0.29,height:30);classes.frame=CGRect(x:x+w*0.34,y:safe.top+45,width:w*0.64,height:30)
         preview.frame=CGRect(x:x,y:safe.top+82,width:w*0.33,height:h-128);status.frame=CGRect(x:x+8,y:safe.top+h-55,width:w*0.31-16,height:45)
         let rightX=x+w*0.34,rightWidth=w*0.64
