@@ -27,3 +27,30 @@ for stem in ['bri_m_head001','bri_m_body001','bri_m_legs001','bri_m_feet001','ge
             uv=np.array([v.texcoord0 for v in mat.vertices]);print('ITEM MESH FORMAT',stem,len(mat.vertices),mat.maps,'UV',uv.min(0).tolist(),uv.max(0).tolist(),'bones',[b.id for b in rig.bones][:15])
 for name in ['british/bri_m_head001_head001/bri_m_head001_head001.tga','british/bri_m_body001_shirt001/bri_m_body001_shirt001.tga']:
     image=Image.open(io.BytesIO(client.read(name)));print('ITEM TEXTURE FORMAT',name,image.size,image.mode)
+import xml.etree.ElementTree as ET,math,subprocess
+root=ET.fromstring(items.read('items.xml'))
+for item in root.findall('.//item'):
+    if int(item.get('id')) in [4,936,935,29,10,980,978,56,36,444]: print('DEFAULT ITEM RECORD',ET.tostring(item,encoding='unicode'))
+extents={}
+for name in items.entries:
+    if not name.endswith('.con'):continue
+    text=items.read(name).decode('latin1')
+    if 'SoldierTextureItem' not in text:continue
+    kind=re.search(r'geometryTemplate.itemType\s+(\S+)',text,re.I)
+    file=re.search(r'geometryTemplate.fileName\s+(\S+)',text,re.I)
+    coord=re.search(r'geometryTemplate.setCoordinate\s+(\d+)/(\d+)',text,re.I)
+    if not kind or not file:continue
+    path=file[1].lower().replace('objects/items/','').strip('"');x,y=(int(coord[1]),int(coord[2])) if coord else (0,0)
+    try:
+        image=Image.open(io.BytesIO(client.read(path)));size=extents.setdefault(kind[1],[0,0]);size[0]=max(size[0],x+image.width);size[1]=max(size[1],y+image.height)
+    except KeyError:pass
+print('ORIGINAL MATERIAL CANVAS EXTENTS',extents)
+for name in ['british_male_soldier/british_male_soldier.con','british_male_soldier/british_male_soldier.tweak']:
+    print('SOLDIER MATERIAL CONFIG',name,'\n'.join(l for l in soldiers.read(name).decode('latin1').splitlines() if any(s in l.lower() for s in ['texture','custom','skin','color','item','material']))[:6000])
+weapons=Archive(base/'Objects/Weapons_server.zip')
+for name in weapons.entries:
+    if not name.endswith(('.con','.tweak')):continue
+    text=weapons.read(name).decode('latin1')
+    if re.search(r'\b3011\b',text):print('WEAPON MODEL ID MAPPING',name,text[:4500])
+listing=subprocess.run(['innoextract','--list','build/original-client/setup.exe'],capture_output=True,text=True).stdout
+print('ORIGINAL LOCALIZATION FILES',[l.strip() for l in listing.splitlines() if any(s in l.lower() for s in ['localization','english','.utxt'])][:35])
