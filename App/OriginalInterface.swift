@@ -5,7 +5,7 @@ import SceneKit
 final class OriginalMenuShell:UIView {
     weak var owner:GameController?
     let canvas=UIView(),paper=UIImageView(),redHeader=UIImageView(),logo=UIImageView(),play=UIButton(type:.custom)
-    let hero=SCNView(),xp=UIProgressView(progressViewStyle:.bar),heroName=ComicLabel(),level=ComicLabel(),nextLevel=ComicLabel()
+    let hero=SCNView(),xp=OriginalXPBar(),heroName=ComicLabel(),level=ComicLabel(),nextLevel=ComicLabel()
     let heading=ComicLabel(),body=ComicLabel(),equipmentHeading=ComicLabel()
     let currencies=(0..<3).map{_ in UIImageView()},balances=(0..<3).map{_ in ComicLabel()}
     let equipment=(0..<10).map{_ in UIImageView()},keys=(0..<10).map{_ in ComicLabel()}
@@ -31,7 +31,7 @@ final class OriginalMenuShell:UIView {
         }
         play.setImage(OriginalUIArt.image("components/buttonplaynow_en.png"),for:.normal);play.frame=CGRect(x:680,y:40,width:92,height:92);play.addAction(UIAction{[weak self] _ in self?.deploy()},for:.touchUpInside);canvas.addSubview(play)
         let strip=UIView(frame:CGRect(x:24,y:139,width:752,height:40));let stripArt=UIImageView(image:OriginalUIArt.image("background/level-background.png"));stripArt.frame=strip.bounds;stripArt.autoresizingMask=[.flexibleWidth,.flexibleHeight];strip.addSubview(stripArt);strip.backgroundColor=UIColor(red:0.92,green:0.9,blue:0.83,alpha:1);strip.layer.borderWidth=2;strip.layer.borderColor=UIColor.darkGray.cgColor;strip.layer.cornerRadius=8;canvas.addSubview(strip)
-        level.frame=CGRect(x:33,y:146,width:28,height:24);nextLevel.frame=CGRect(x:264,y:146,width:28,height:24);xp.frame=CGRect(x:66,y:155,width:192,height:8);xp.progressTintColor=UIColor(red:0.44,green:0.67,blue:0.2,alpha:1);xp.trackTintColor=UIColor.darkGray
+        level.frame=CGRect(x:33,y:146,width:28,height:24);nextLevel.frame=CGRect(x:264,y:146,width:28,height:24);xp.frame=CGRect(x:66,y:141,width:192,height:30)
         heroName.frame=CGRect(x:63,y:181,width:220,height:25);heroName.backgroundColor=UIColor.darkGray;heroName.layer.cornerRadius=5;heroName.clipsToBounds=true
         for v in [level,nextLevel,xp,heroName]{canvas.addSubview(v)}
         for (i,suffix) in ["icons/currency_hp.png","icons/currency_vp.png","icons/currency_bf.png"].enumerated(){currencies[i].image=OriginalUIArt.image(suffix);currencies[i].frame=CGRect(x:CGFloat(324+i*127),y:137,width:43,height:43);currencies[i].contentMode = .scaleAspectFit;balances[i].frame=CGRect(x:CGFloat(367+i*127),y:147,width:75,height:23);canvas.addSubview(currencies[i]);canvas.addSubview(balances[i])}
@@ -77,7 +77,7 @@ final class OriginalMenuShell:UIView {
 
 // Shared Flash-menu artwork; controls are placed in the original 800×600 coordinate space.
 final class OriginalInventoryChrome:UIView {
-    let canvas=UIView(),heading=ComicLabel(),heroName=ComicLabel(),level=ComicLabel(),xp=UIProgressView(progressViewStyle:.bar)
+    let canvas=UIView(),heading=ComicLabel(),heroName=ComicLabel(),level=ComicLabel(),xp=OriginalXPBar()
     var title="My Stuff",section="Appearance",onBack:(()->Void)?,onSection:((Int)->Void)?
     var tabs:[UIButton]=[],sections:[UIButton]=[],balances:[ComicLabel]=[]
     override init(frame:CGRect){
@@ -88,7 +88,7 @@ final class OriginalInventoryChrome:UIView {
         for (i,name) in ["Home","My Stuff","Store","Friends","Options"].enumerated(){let b=button(name,size:20);b.setBackgroundImage(nil,for:.normal);b.frame=CGRect(x:CGFloat(29+i*130),y:59,width:125,height:40);b.addAction(UIAction{[weak self] _ in if i==0 || i==1 || i==2 {self?.onBack?()}},for:.touchUpInside);canvas.addSubview(b);tabs.append(b)}
         for (i,name) in ["Appearance","Weapons","Abilities","Emotes","Widgets","Missions"].enumerated(){let b=button(name,size:14);b.setBackgroundImage(nil,for:.normal);b.frame=CGRect(x:CGFloat(25+i*107),y:103,width:107,height:29);b.isEnabled=i<2;b.addAction(UIAction{[weak self] _ in self?.onSection?(i)},for:.touchUpInside);canvas.addSubview(b);sections.append(b)}
         let back=button("Back",size:13);back.frame=CGRect(x:685,y:36,width:85,height:29);back.addAction(UIAction{[weak self] _ in self?.onBack?()},for:.touchUpInside);canvas.addSubview(back)
-        art("background/level-background.png",CGRect(x:24,y:139,width:752,height:40));level.frame=CGRect(x:36,y:146,width:28,height:25);xp.frame=CGRect(x:71,y:155,width:197,height:9);xp.progressTintColor=UIColor(red:0.41,green:0.65,blue:0.18,alpha:1);xp.trackTintColor = .darkGray;heroName.frame=CGRect(x:71,y:181,width:217,height:23);heroName.backgroundColor = .darkGray;heroName.layer.cornerRadius=4;heroName.clipsToBounds=true;for v in [level,xp,heroName]{canvas.addSubview(v)}
+        art("background/level-background.png",CGRect(x:24,y:139,width:752,height:40));level.frame=CGRect(x:36,y:146,width:28,height:25);xp.frame=CGRect(x:71,y:142,width:197,height:30);heroName.frame=CGRect(x:71,y:181,width:217,height:23);heroName.backgroundColor = .darkGray;heroName.layer.cornerRadius=4;heroName.clipsToBounds=true;for v in [level,xp,heroName]{canvas.addSubview(v)}
         for (i,s) in ["icons/currency_hp.png","icons/currency_vp.png","icons/currency_bf.png"].enumerated(){art(s,CGRect(x:CGFloat(319+i*133),y:133,width:49,height:49));let l=ComicLabel(frame:CGRect(x:CGFloat(367+i*133),y:146,width:77,height:25));canvas.addSubview(l);balances.append(l)}
         art("panels/01_bgframelargelong.png",CGRect(x:336,y:211,width:437,height:375),stretch:true);art("panels/01_fgtabwide.png",CGRect(x:336,y:211,width:437,height:34));heading.frame=CGRect(x:339,y:211,width:430,height:31);canvas.addSubview(heading)
     }
@@ -98,4 +98,13 @@ final class OriginalInventoryChrome:UIView {
     func button(_ name:String,size:CGFloat)->UIButton {let b=UIButton(type:.custom);b.setBackgroundImage(OriginalUIArt.image("components/button.png")?.resizableImage(withCapInsets:UIEdgeInsets(top:7,left:8,bottom:7,right:8)),for:.normal);b.setAttributedTitle(NSAttributedString(string:name,attributes:[.font:OriginalFont.heavy(size),.foregroundColor:UIColor.white,.strokeColor:UIColor.black,.strokeWidth:-5,.kern:0.7]),for:.normal);return b}
     func refresh(_ p:HeroCareer,faction:Int,kind:HeroClass){level.write(String(p.level),size:15);xp.progress=Float(p.levelFraction);heroName.write("\(faction==1 ? "Royal" : "National") \(kind.rawValue)",size:12);for (i,n) in [p.heroPoints,p.valor,p.funds].enumerated(){balances[i].write(String(n),size:17)};for (i,b) in tabs.enumerated(){b.setTitleColor(["Home","My Stuff","Store","Friends","Options"][i]==title ? .yellow : .white,for:.normal);let old=b.attributedTitle(for:.normal);if let old=old{let a=NSMutableAttributedString(attributedString:old);a.addAttribute(.foregroundColor,value:["Home","My Stuff","Store","Friends","Options"][i]==title ? UIColor.yellow : UIColor.white,range:NSRange(location:0,length:a.length));b.setAttributedTitle(a,for:.normal)}};for (i,b) in sections.enumerated(){let old=b.attributedTitle(for:.normal);if let old=old{let a=NSMutableAttributedString(attributedString:old);a.addAttribute(.foregroundColor,value:["Appearance","Weapons","Abilities","Emotes","Widgets","Missions"][i]==section ? UIColor.yellow : UIColor.white,range:NSRange(location:0,length:a.length));b.setAttributedTitle(a,for:.normal)}}}
     override func layoutSubviews(){super.layoutSubviews();let b=bounds.inset(by:safeAreaInsets),scale=min((b.width-8)/800,(b.height-8)/600);canvas.transform=CGAffineTransform(scaleX:scale,y:scale);canvas.center=CGPoint(x:b.midX,y:b.midY)}
+}
+
+final class OriginalXPBar:UIView {
+    let empty=UIImageView(image:OriginalUIArt.image("components/barxpemptyshorteor.png")),full=UIImageView(image:OriginalUIArt.image("components/barxpfullshorteor.png")),mask=CALayer()
+    var progress:Float=0 {didSet{setNeedsLayout()}}
+    override init(frame:CGRect){super.init(frame:frame);addSubview(empty);addSubview(full);mask.backgroundColor=UIColor.white.cgColor;full.layer.mask=mask}
+    convenience init(){self.init(frame:.zero)}
+    required init?(coder:NSCoder){fatalError()}
+    override func layoutSubviews(){super.layoutSubviews();empty.frame=bounds;full.frame=bounds;CATransaction.begin();CATransaction.setDisableActions(true);mask.frame=CGRect(x:0,y:0,width:bounds.width*CGFloat(max(0,min(1,progress))),height:bounds.height);CATransaction.commit()}
 }

@@ -124,7 +124,6 @@ final class GameController: UIViewController {
         animator.weaponPose=loadout?.weapons.first.flatMap{wardrobe?.weapons[$0]?.pose} ?? "smg"
         animators.append(animator)
         let root=animator.node
-        let marker=sphere(0.1,team == 0 ? blue : red); marker.position.y=2.3; root.addChildNode(marker)
         let gun=try loadout?.weapons.first.flatMap{wardrobe?.weapons[$0]}.map{try original.model($0.model)} ?? original.weapon(kind,team);gun.name="held-weapon";animator.bones[44].addChildNode(gun)
         return root
     }
@@ -151,16 +150,13 @@ final class GameController: UIViewController {
         let aim=g.objectives[0].p-g.bases[selectedTeam];yaw=atan2(aim.x,aim.z)
         if selectedMode == .conquest || selectedMode == .rocket {
             for o in g.objectives {
-                let ring=SCNTorus(ringRadius:3.5,pipeRadius:0.06); ring.firstMaterial?.diffuse.contents=UIColor.white
-                let node=SCNNode(geometry:ring); node.position=SCNVector3(Float(o.p.x),original.height(o.p)+0.07,Float(o.p.z)); world.addChildNode(node); objectiveNodes.append(node)
+                let node=SCNNode(); node.position=SCNVector3(Float(o.p.x),original.height(o.p),Float(o.p.z)); world.addChildNode(node); objectiveNodes.append(node)
                 if let pole=try? original.flag("pole") { pole.position=SCNVector3(Float(o.p.x),original.height(o.p),Float(o.p.z));world.addChildNode(pole) }
-                for key in ["royal","national","neutral"] { if let flag=try? original.flag(key) { flag.name=key;flag.position.y = -0.07;flag.isHidden=key != "neutral";node.addChildNode(flag) } }
+                for key in ["royal","national","neutral"] { if let flag=try? original.flag(key) { flag.name=key;flag.position.y = 0;flag.isHidden=key != "neutral";node.addChildNode(flag) } }
 
             }
         }
         for t in 0..<2 {
-            let base=SCNTorus(ringRadius:3,pipeRadius:0.13); base.firstMaterial?.diffuse.contents=t == 0 ? blue : red
-            let n=SCNNode(geometry:base); n.position=SCNVector3(Float(g.bases[t].x),original.height(g.bases[t])+0.1,Float(g.bases[t].z)); world.addChildNode(n)
             let flag=(try? original.flag(t == 0 ? "ctf-royal" : "ctf-national")) ?? SCNNode(); world.addChildNode(flag); flag.isHidden=selectedMode != .flags; flagNodes.append(flag)
         }
         do { for h in g.heroes { let n=try soldier(h.kind,h.team,loadout:h.id==0 ? playerLoadout : wardrobe?.defaults(h.team+1,h.kind)); world.addChildNode(n); nodes.append(n) } } catch { showMenu(result:"CHARACTER LOAD FAILED"); return }
@@ -208,7 +204,6 @@ final class GameController: UIViewController {
             nodes[i].opacity=h.invulnerable>0 ? 0.55 : 1
         }
         for (i,o) in g.objectives.enumerated() where i<objectiveNodes.count {
-            objectiveNodes[i].geometry?.firstMaterial?.diffuse.contents=o.owner == 0 ? blue : o.owner == 1 ? red : UIColor.white
             let key=o.owner == 0 ? "royal" : o.owner == 1 ? "national" : "neutral"
             for child in objectiveNodes[i].childNodes { child.isHidden=child.name != key }
         }
@@ -323,7 +318,7 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
         factions.isHidden=true;classes.isHidden=true;close.isHidden=true
         for (i,name) in ["Royal","National","Commando","Soldier","Gunner"].enumerated(){let b=chrome.button(name,size:12);b.addAction(UIAction{[weak self] _ in guard let self=self else{return};if i<2 {self.changeHero(faction:i+1,kind:self.kind)}else{self.changeHero(faction:self.faction,kind:[HeroClass.scout,.soldier,.heavy][i-2])};self.factions.selectedSegmentIndex=self.faction-1;self.classes.selectedSegmentIndex=self.kind.kit},for:.touchUpInside);chrome.canvas.addSubview(b);heroSelectors.append(b)}
         preview.scene=previewScene;preview.backgroundColor = .clear;preview.isOpaque=false;previewScene.background.contents=UIColor.clear;preview.antialiasingMode = .multisampling4X;preview.isPlaying=true;preview.pointOfView=previewCamera
-        previewScene.rootNode.addChildNode(heroRoot);previewCamera.camera=SCNCamera();previewCamera.camera?.fieldOfView=36;previewCamera.position=SCNVector3(0,1.2,4.7);previewCamera.look(at:SCNVector3(0,1.1,0));previewScene.rootNode.addChildNode(previewCamera)
+        previewScene.rootNode.addChildNode(heroRoot);previewCamera.camera=SCNCamera();previewCamera.camera?.fieldOfView=30;previewCamera.position=SCNVector3(0,1.2,3.4);previewCamera.look(at:SCNVector3(0,1.1,0));previewScene.rootNode.addChildNode(previewCamera)
         let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=900;previewScene.rootNode.addChildNode(ambient)
         let light=SCNNode();light.light=SCNLight();light.light?.type = .directional;light.light?.intensity=1100;light.eulerAngles=SCNVector3(-0.5,-0.4,0);previewScene.rootNode.addChildNode(light)
         let pan=UIPanGestureRecognizer(target:self,action:#selector(turn(_:)));preview.addGestureRecognizer(pan)
@@ -350,8 +345,8 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
     override func viewDidDisappear(_ animated:Bool) {super.viewDidDisappear(animated);link?.invalidate();link=nil}
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews();chrome.frame=view.bounds;chrome.setNeedsLayout();chrome.layoutIfNeeded()
-        heroTitle.frame=CGRect(x:35,y:438,width:274,height:22);preview.frame=CGRect(x:26,y:187,width:293,height:246);status.frame=CGRect(x:24,y:552,width:295,height:37)
-        for (i,b) in heroSelectors.enumerated(){b.frame=i<2 ? CGRect(x:CGFloat(38+i*137),y:464,width:131,height:28) : CGRect(x:CGFloat(29+(i-2)*96),y:500,width:91,height:28);b.alpha=(i<2 ? i+1==faction : i-2==kind.kit) ? 1 : 0.6}
+        heroTitle.isHidden=true;preview.frame=CGRect(x:26,y:213,width:293,height:284);status.frame=CGRect(x:24,y:564,width:295,height:29)
+        for (i,b) in heroSelectors.enumerated(){b.frame=i<2 ? CGRect(x:CGFloat(38+i*137),y:499,width:131,height:28) : CGRect(x:CGFloat(29+(i-2)*96),y:533,width:91,height:28);b.alpha=(i<2 ? i+1==faction : i-2==kind.kit) ? 1 : 0.6}
         categoryScroll.frame=CGRect(x:344,y:223,width:420,height:34);categoryStack.frame=CGRect(origin:.zero,size:categoryStack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize));categoryScroll.contentSize=categoryStack.bounds.size
         search.frame=CGRect(x:340,y:259,width:265,height:42);slots.frame=CGRect(x:612,y:269,width:150,height:24)
         collection.frame=CGRect(x:348,y:306,width:411,height:226);let layout=collection.collectionViewLayout as! UICollectionViewFlowLayout;layout.itemSize=CGSize(width:CGFloat(411-24)/4,height:104)
@@ -433,7 +428,7 @@ final class ComicLabel:UILabel {
     var ink=UIColor(red:0.12,green:0.12,blue:0.08,alpha:1)
     func write(_ value:String,color:UIColor = .white,size:CGFloat=24) {
         attributedText=NSAttributedString(string:value,attributes:[.font:OriginalFont.heavy(size),.foregroundColor:color,.strokeColor:ink,.strokeWidth:-5])
-        textAlignment = .center;layer.shadowColor=UIColor.black.cgColor;layer.shadowOpacity=0.7;layer.shadowOffset=CGSize(width:1,height:2);layer.shadowRadius=0
+        textAlignment = .center;layer.shadowColor=UIColor.black.cgColor;layer.shadowOpacity=0;layer.shadowOffset = .zero;layer.shadowRadius=0
     }
 }
 
@@ -571,6 +566,7 @@ final class CareerController:UIViewController {
     let faction:Int,kind:HeroClass
     var done:(()->Void)?
     let chrome=OriginalInventoryChrome(),preview=SCNView(),heading=ComicLabel(),details=ComicLabel(),progress=UIProgressView(progressViewStyle:.bar),upgrade=UIButton(type:.custom),missions=UILabel(),abilityIcon=UIImageView()
+    let rankSegments=(0..<5).map{_ in UIImageView()},rankStar=UIImageView()
     var actor:AnimatedCharacter?,link:CADisplayLink?,last=0.0
     init(faction:Int,kind:HeroClass){self.faction=faction;self.kind=kind;super.init(nibName:nil,bundle:nil)}
     required init?(coder:NSCoder){fatalError()}
@@ -584,6 +580,8 @@ final class CareerController:UIViewController {
         heading.frame=CGRect(x:428,y:257,width:325,height:24);details.frame=CGRect(x:428,y:286,width:318,height:19);progress.frame=CGRect(x:437,y:315,width:160,height:12);progress.progressTintColor=UIColor(red:0.2,green:0.5,blue:0.7,alpha:1);progress.trackTintColor = .lightGray
         abilityIcon.image=OriginalUIArt.image("abilities/ability\(kind == .soldier ? 2001 : kind == .heavy ? 2011 : 2016).tga");abilityIcon.contentMode = .scaleAspectFit;abilityIcon.frame=CGRect(x:357,y:270,width:65,height:51)
         upgrade.setBackgroundImage(OriginalUIArt.image("components/button.png")?.resizableImage(withCapInsets:UIEdgeInsets(top:7,left:8,bottom:7,right:8)),for:.normal);upgrade.setTitleColor(.white,for:.normal);upgrade.titleLabel?.font=OriginalFont.heavy(13);upgrade.frame=CGRect(x:610,y:302,width:136,height:30)
+        progress.isHidden=true
+        for (i,v) in rankSegments.enumerated(){v.frame=CGRect(x:CGFloat(437+i*19),y:306,width:19,height:18);chrome.canvas.addSubview(v)};rankStar.frame=CGRect(x:526,y:299,width:31,height:31);chrome.canvas.addSubview(rankStar)
         missions.frame=CGRect(x:355,y:376,width:398,height:153);missions.numberOfLines=7;missions.textColor=UIColor(white:0.15,alpha:1);missions.font=OriginalFont.heavy(15);missions.textAlignment = .left
         let missionTitle=ComicLabel(frame:CGRect(x:352,y:350,width:403,height:24));missionTitle.backgroundColor=UIColor(red:0.5,green:0.16,blue:0.14,alpha:1);missionTitle.write("Offline Missions",size:16);chrome.canvas.addSubview(missionTitle)
         for v in [heading,details,progress,abilityIcon,upgrade,missions]{chrome.canvas.addSubview(v)}
@@ -603,6 +601,7 @@ final class CareerController:UIViewController {
         let p=CareerStore.shared.load(faction,kind);chrome.refresh(p,faction:faction,kind:kind)
         heading.write("\(kind == .soldier ? "Combat Medicine" : kind == .heavy ? "Hero's Shield" : "Stealth")    (\(p.abilityRank)/5)",size:14)
         details.write("Cost: 1 Hero Point",size:13);progress.progress=Float(p.abilityRank)/5
+        for (i,v) in rankSegments.enumerated(){v.image=OriginalUIArt.image("components/barstarcenter.png");v.alpha=i<p.abilityRank ? 1 : 0.25};rankStar.image=OriginalUIArt.image("components/"+(p.abilityRank==5 ? "barstaractive.png" : "barstarinactive.png"))
         missions.text="First Battle   \(min(1,p.matches))/1   •   100 VP\n\nInfantry Hunter   \(min(10,p.kills))/10   •   150 VP\n\nFlag Hero   \(min(3,p.captures))/3   •   200 VP"
         upgrade.setTitle("Upgrade • 1 HP",for:.normal);upgrade.isEnabled=p.heroPoints>0 && p.abilityRank<5;upgrade.alpha=upgrade.isEnabled ? 1 : 0.45
     }

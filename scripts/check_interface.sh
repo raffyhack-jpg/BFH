@@ -26,6 +26,8 @@ build/asset-python/bin/python - <<'PY'
 from PIL import Image
 import io,base64
 for page in ('menu','wardrobe','abilities','gameplay'):
- im=Image.open(f'build/original-{page}-native.png');im.thumbnail((1400,900));b=io.BytesIO();im.convert('RGB').save(b,format='JPEG',quality=85)
+ path=f'build/original-{page}-native.png';im=Image.open(path)
+ if im.height>im.width:im=im.transpose(Image.Transpose.ROTATE_90);im.save(path)
+ im.thumbnail((1400,900));b=io.BytesIO();im.convert('RGB').save(b,format='JPEG',quality=85)
  print(page.upper()+'_UI_VISUAL='+base64.b64encode(b.getvalue()).decode())
 PY

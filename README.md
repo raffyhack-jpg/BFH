@@ -17,7 +17,7 @@ permission; the MIT license covers original code only.
 - Hero preview, faction/class selection, clothing categories, skin/hair palettes and saved loadouts.
 - Selectable original weapon models, two weapon slots, magazine counts, reloads and weapon animation poses.
 - Original sky dome/sky texture, capture flags and flagpole geometry.
-- Original Flash menu logo and scenic backdrop, imported without redrawing.
+- Original Flash menu parchment, painted red navigation, olive panels, equipment frames, Play Now button, currency icons, animated faction HUD flags and scenic backdrop, imported without redrawing. Native menus use the original 800×600 layout fitted to the phone.
 - Conquest: capture the map objectives, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
   dropped flags return after eighteen seconds.
@@ -67,7 +67,7 @@ and disk space. On macOS the preparation script installs innoextract through
 Homebrew and uses a local Python virtual environment with NumPy and Pillow.
 
 Successful builds on main publish their verified unsigned IPA and asset previews
-as private prerelease assets. Download the newest build from Releases. This avoids
+as prerelease assets. Download the newest build from Releases. This avoids
 Actions artifact storage limits. The manual `publish-ipa.yml` workflow is also
 available. Both publishing jobs use contents-write permission with checkout
 credential persistence disabled.
@@ -91,7 +91,7 @@ verified an unsigned ARM64 IPA. Core checks cover objective scoring, ticket drai
 kill credit, respawn, flags, victory, obstacle routing, pause, and bot combat/match
 completion in each implemented mode. The original characters were integrated
 subsequently; their SceneKit validation and rebuild status are reported in CI.
-There has been no iPhone installation, touch playtest, frame-rate/thermal profile,
+Native iPhone simulator screen captures are published with current builds. There has been no controlled physical-device touch playtest, frame-rate/thermal profile,
 or bot difficulty/balance playtest. No build should be described as a polished
 finished game.
 
@@ -198,3 +198,7 @@ and the full original mission catalog remain unfinished.
 Career saves, purchases, Hero Point spending and repeated match reward claims
 are covered by game-core checks. A successful native build and device visual
 playtest are still required before calling this release verified or polished.
+
+## Interface reference and visual checks
+
+See [original interface references](docs/original-interface-reference.md) for the inspected screenshots/footage, asset mapping and fidelity gaps. `bash scripts/check_interface.sh` captures the running native menu, store, abilities and gameplay on an installed iPhone simulator.
