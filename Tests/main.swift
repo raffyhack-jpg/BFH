@@ -72,3 +72,25 @@ meleeGame.shoot(blade,aim:V2(x:1,z:0),bot:false)
 check(closeTarget.hp==closeTarget.kind.hp-35 && meleeGame.shots.isEmpty,"Knife must strike nearby targets without a bullet tracer")
 check(blade.ammunition[0]==0 && blade.reloadRemaining==0,"Knife must not consume ammunition")
 print("Validated close-range melee equipment without bullet traces or magazine reloads")
+
+let aimingGame=Game(mode:.conquest,hero:.soldier)
+aimingGame.heroes.forEach{$0.p=V2(x:-20,z:15)}
+let marksman=aimingGame.heroes[0],raised=aimingGame.heroes[8]
+marksman.p=V2(x:0,z:0);raised.p=V2(x:0,z:10);raised.elevation=3;raised.invulnerable=0
+marksman.equip([WeaponProfile(id:4,name:"Rifle",damage:20,interval:0.2,range:40,magazine:20,reloadTime:1)])
+aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:V3(x:0,y:4.1,z:10))
+check(raised.hp==raised.kind.hp-20,"Looking up must hit an elevated target")
+check(aimingGame.shots.last!.toY>3,"Tracer must rise to the elevated target")
+marksman.cooldown=0
+aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:V3(x:0,y:1.2,z:10))
+check(raised.hp==raised.kind.hp-20,"Horizontal shot must miss a target above the crosshair")
+marksman.cooldown=0
+aimingGame.shotObstacle={ from,to in from+(to-from)*0.1 }
+aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:V3(x:0,y:4.1,z:10))
+check(raised.hp==raised.kind.hp-20,"Scenery must block shots before they reach a target")
+aimingGame.shotObstacle=nil;marksman.cooldown=0
+let friend=aimingGame.heroes[1];friend.p=V2(x:0,z:5);friend.elevation=1.45
+aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:V3(x:0,y:4.1,z:10))
+check(raised.hp==raised.kind.hp-20 && friend.hp==friend.kind.hp,"A teammate must stop the ray without friendly damage")
+check(capsuleHit(origin:V3(x:0,y:1,z:0),direction:V3(x:0,y:0,z:1),feet:V3(x:0,y:0,z:10))!<10,"Capsule intersection must hit the front surface")
+print("Validated crosshair height, airborne targets, scenery obstruction and teammate shielding")

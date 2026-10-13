@@ -102,6 +102,38 @@ final class OriginalWorld {
         }
         cache[name]=root;return root.clone()
     }
+    func shotEnd(from:SIMD3<Float>,to:SIMD3<Float>)->SIMD3<Float> {
+        let direction=to-from
+        var fraction:Float=1
+        let steps=max(1,Int(ceil(simd_length(direction)/0.4)))
+        var visited:Set<Int>=[]
+        for i in 0...steps {
+            let f=Float(i)/Float(steps),point=from+direction*f
+            // Ground uses the actual terrain surface; decks are triangle-tested separately.
+            if point.y<=terrainHeight(V2(x:Double(point.x),z:Double(point.z))) {
+                var low=max(0,f-1/Float(steps)),high=f
+                for _ in 0..<8 {
+                    let mid=(low+high)/2,q=from+direction*mid
+                    if q.y<=terrainHeight(V2(x:Double(q.x),z:Double(q.z))) { high=mid } else { low=mid }
+                }
+                fraction=min(fraction,high);break
+            }
+            let key=Int(floor(point.x/8))*10000+Int(floor(point.z/8))
+            if !visited.insert(key).inserted { continue }
+            for t in (wallCells[key] ?? [])+(deckCells[key] ?? []) {
+                let a=SIMD3(t[0],t[1],t[2]),b=SIMD3(t[3],t[4],t[5]),c=SIMD3(t[6],t[7],t[8])
+                let e1=b-a,e2=c-a,p=simd_cross(direction,e2),det=simd_dot(e1,p)
+                if abs(det)<0.000001 { continue }
+                let v=from-a,u=simd_dot(v,p)/det
+                if u<0 || u>1 { continue }
+                let q=simd_cross(v,e1),w=simd_dot(direction,q)/det
+                if w<0 || u+w>1 { continue }
+                let hit=simd_dot(e2,q)/det
+                if hit>0.00001 && hit<fraction { fraction=hit }
+            }
+        }
+        return from+direction*fraction
+    }
     func cameraPosition(from:SIMD3<Float>,to:SIMD3<Float>)->SIMD3<Float> {
         let direction=to-from;let distance=simd_length(direction)
         guard distance>0.01 else { return to }

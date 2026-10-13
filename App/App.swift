@@ -120,6 +120,11 @@ final class GameController: UIViewController {
         menu?.removeFromSuperview(); menu=nil; firing=false; yaw = .pi/2; pitch=0.08; left.reset();right.reset();fire.reset();cameraReady=false;jumpRequested=false
         guard let original=originalWorld else { notice.text="Original assets could not be loaded. Rebuild the IPA."; showMenu(result:"ASSET LOAD FAILED"); return }
         let g=Game(mode:selectedMode,hero:selectedClass,layout:original.layout,playerTeam:selectedTeam); game=g
+        g.groundHeight={ Double(original.height($0)) }
+        g.shotObstacle={ from,to in
+            let end=original.shotEnd(from:SIMD3(Float(from.x),Float(from.y),Float(from.z)),to:SIMD3(Float(to.x),Float(to.y),Float(to.z)))
+            return V3(x:Double(end.x),y:Double(end.y),z:Double(end.z))
+        }
         world.childNodes.forEach{$0.removeFromParentNode()}; effects.childNodes.forEach{$0.removeFromParentNode()}; nodes=[]; animators=[]; previousPositions=g.heroes.map{$0.p}; objectiveNodes=[]; flagNodes=[]
         do { try original.populate(world); let sky=try original.sky();world.addChildNode(sky);skyNode=sky } catch { showMenu(result:"MAP LOAD FAILED"); return }
         playerLoadout=wardrobe?.load(selectedTeam+1,selectedClass) ?? HeroLoadout()
@@ -158,7 +163,22 @@ final class GameController: UIViewController {
         yaw-=Double(look.x+shootLook.x)*0.0045;pitch=max(-0.35,min(0.65,pitch+Double(look.y+shootLook.y)*0.0035));firing=fire.isHeld
         let forward=V2(x:sin(yaw),z:cos(yaw)), sideways=V2(x:-cos(yaw),z:sin(yaw))
         let move=forward * -Double(left.value.y)+sideways*Double(left.value.x)
-        g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false,jump:jumpRequested));jumpRequested=false
+        let player=g.heroes[0], p=player.p
+        let ground=(originalWorld?.height(p) ?? 0)+Float(player.elevation)
+        let focus=SIMD3(Float(p.x),ground+1.5,Float(p.z)),direction=ThirdPersonCamera.direction(yaw:Float(yaw),pitch:Float(pitch))
+        let shoulder=SIMD3<Float>(-cos(Float(yaw)),0,sin(Float(yaw)))*0.55
+        let desired=focus-direction*4.6+shoulder
+        let safe=originalWorld?.cameraPosition(from:focus,to:desired) ?? desired
+        camera.simdPosition=cameraReady ? simd_mix(camera.simdPosition,safe,SIMD3(repeating:Float(1-exp(-dt*18)))) : safe
+        camera.simdOrientation=ThirdPersonCamera.rotation(position:camera.simdPosition,target:focus+direction*30+shoulder);cameraReady=true
+        skyNode?.position=camera.position
+        let rayOrigin=camera.simdPosition
+        let rayDirection=simd_normalize(focus+direction*30+shoulder-rayOrigin)
+        let distant=rayOrigin+rayDirection*150
+        let reticlePoint=originalWorld?.shotEnd(from:rayOrigin,to:distant) ?? distant
+        let aimPoint=V3(x:Double(reticlePoint.x),y:Double(reticlePoint.y),z:Double(reticlePoint.z))
+        g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false,jump:jumpRequested,aimPoint:aimPoint));jumpRequested=false
+
         for (i,h) in g.heroes.enumerated() {
             nodes[i].position=SCNVector3(Float(h.p.x),(originalWorld?.height(h.p) ?? 0)+Float(h.elevation),Float(h.p.z)); nodes[i].eulerAngles.y=Float(h.facing); if let animator=animators[i] {
                 if let id=h.weapon?.id,id != animator.weaponID,let weapon=wardrobe?.weapons[id],let original=originalWorld,let node=try? original.model(weapon.model) {
@@ -176,15 +196,6 @@ final class GameController: UIViewController {
             for child in objectiveNodes[i].childNodes { child.isHidden=child.name != key }
         }
         for i in 0..<2 { flagNodes[i].position=SCNVector3(Float(g.flags[i].p.x),(originalWorld?.height(g.flags[i].p) ?? 0),Float(g.flags[i].p.z)) }
-        let player=g.heroes[0], p=player.p
-        let ground=(originalWorld?.height(p) ?? 0)+Float(player.elevation)
-        let focus=SIMD3(Float(p.x),ground+1.5,Float(p.z)),direction=ThirdPersonCamera.direction(yaw:Float(yaw),pitch:Float(pitch))
-        let shoulder=SIMD3<Float>(-cos(Float(yaw)),0,sin(Float(yaw)))*0.55
-        let desired=focus-direction*4.6+shoulder
-        let safe=originalWorld?.cameraPosition(from:focus,to:desired) ?? desired
-        camera.simdPosition=cameraReady ? simd_mix(camera.simdPosition,safe,SIMD3(repeating:Float(1-exp(-dt*18)))) : safe
-        camera.simdOrientation=ThirdPersonCamera.rotation(position:camera.simdPosition,target:focus+direction*30+shoulder);cameraReady=true
-        skyNode?.position=camera.position
         for shot in g.shots { tracer(shot) }
         hudTime+=dt
         if hudTime>0.15 {
@@ -202,8 +213,8 @@ final class GameController: UIViewController {
         if let winner=g.winner { showMenu(result:winner == -1 ? "DRAW" : winner == 0 ? "ROYAL VICTORY" : "NATIONAL VICTORY") }
     }
     func tracer(_ shot:Shot) {
-        let a=SCNVector3(Float(shot.from.x),(originalWorld?.height(shot.from) ?? 0)+1.2,Float(shot.from.z)), b=SCNVector3(Float(shot.to.x),(originalWorld?.height(shot.to) ?? 0)+1.2,Float(shot.to.z))
-        let cylinder=SCNCylinder(radius:0.025,height:CGFloat(shot.from.distance(shot.to))); cylinder.radialSegmentCount=4
+        let a=SCNVector3(Float(shot.from.x),Float(shot.fromY),Float(shot.from.z)), b=SCNVector3(Float(shot.to.x),Float(shot.toY),Float(shot.to.z))
+        let cylinder=SCNCylinder(radius:0.025,height:CGFloat(sqrt(pow(shot.from.distance(shot.to),2)+pow(shot.toY-shot.fromY,2)))); cylinder.radialSegmentCount=4
         cylinder.firstMaterial?.diffuse.contents=UIColor.yellow; cylinder.firstMaterial?.emission.contents=UIColor.yellow
         let node=SCNNode(geometry:cylinder); node.position=SCNVector3((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2); node.look(at:b,up:SCNVector3(0,1,0),localFront:SCNVector3(0,1,0)); effects.addChildNode(node)
         node.runAction(.sequence([.wait(duration:0.06),.removeFromParentNode()]))

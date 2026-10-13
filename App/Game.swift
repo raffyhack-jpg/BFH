@@ -10,6 +10,33 @@ struct V2: Equatable {
     var unit: V2 { length > 0.001 ? self * (1/length) : .zero }
     func distance(_ b: V2) -> Double { (self-b).length }
 }
+struct V3: Equatable {
+    var x:Double,y:Double,z:Double
+    static func + (a:V3,b:V3)->V3 { V3(x:a.x+b.x,y:a.y+b.y,z:a.z+b.z) }
+    static func - (a:V3,b:V3)->V3 { V3(x:a.x-b.x,y:a.y-b.y,z:a.z-b.z) }
+    static func * (a:V3,b:Double)->V3 { V3(x:a.x*b,y:a.y*b,z:a.z*b) }
+    func dot(_ b:V3)->Double { x*b.x+y*b.y+z*b.z }
+    var length:Double { sqrt(dot(self)) }
+    var unit:V3 { length>0.00001 ? self*(1/length) : V3(x:0,y:0,z:1) }
+    var horizontal:V2 { V2(x:x,z:z) }
+}
+// Vertical capsule: feet and jumping body remain hittable without oversized cones.
+func capsuleHit(origin:V3,direction:V3,feet:V3,radius:Double=0.45)->Double? {
+    var hits:[Double]=[]
+    for y in [radius,1.8-radius] {
+        let offset=origin-(feet+V3(x:0,y:y,z:0))
+        let b=offset.dot(direction),c=offset.dot(offset)-radius*radius,d=b*b-c
+        if d>=0 { let t = -b-sqrt(d);if t>=0 { hits.append(t) } }
+    }
+    let offset=origin-feet,a=direction.x*direction.x+direction.z*direction.z
+    let b=offset.x*direction.x+offset.z*direction.z,c=offset.x*offset.x+offset.z*offset.z-radius*radius
+    let d=b*b-a*c
+    if a>0.000001 && d>=0 {
+        let t=(-b-sqrt(d))/a,y=offset.y+t*direction.y
+        if t>=0 && y>=radius && y<=1.8-radius { hits.append(t) }
+    }
+    return hits.min()
+}
 enum Mode: String, CaseIterable { case conquest = "Conquest", flags = "Capture the Flag", elimination = "Elimination", rocket = "Rocket Control" }
 enum HeroClass: String, CaseIterable {
     case soldier = "Soldier", heavy = "Gunner", scout = "Commando"
@@ -64,8 +91,8 @@ final class Hero {
         self.id=id; self.team=team; self.kind=kind; self.p=p; hp=kind.hp
     }
 }
-struct Shot { var from: V2; var to: V2; var team: Int }
-struct Input { var move = V2.zero; var yaw: Double = 0; var fire = false; var ability = false; var jump=false }
+struct Shot { var from: V2; var to: V2; var team: Int; var fromY:Double=1.2;var toY:Double=1.2 }
+struct Input { var move = V2.zero; var yaw: Double = 0; var fire = false; var ability = false; var jump=false;var aimPoint:V3?=nil }
 struct RNG {
     var state: UInt64 = 42
     mutating func next() -> Double {
@@ -77,6 +104,8 @@ final class Game {
     let mode: Mode
     var heroes: [Hero] = []
     var bases = [V2(x:-24,z:0),V2(x:24,z:0)]
+    var groundHeight:(V2)->Double = { _ in 0 }
+    var shotObstacle:((V3,V3)->V3)?=nil
     var mapLayout:MapLayout?
     var spatialBlocks:[Int:[Block]]=[:]
     var navigationEdges:[Int:[Int]]=[:]
@@ -262,13 +291,31 @@ final class Game {
         guard h.alive,h.equipped.count>1 else { return }
         h.weaponSlot=(h.weaponSlot+1)%h.equipped.count;h.reloadRemaining=0;h.cooldown=0.2
     }
-    func shoot(_ h: Hero, aim: V2, bot: Bool) {
+    func shoot(_ h: Hero, aim: V2, bot: Bool, aimPoint:V3?=nil) {
         guard h.cooldown <= 0,h.reloadRemaining<=0 else { return }
         if let weapon=h.weapon,weapon.magazine>0 {
             if h.ammunition[h.weaponSlot]<=0 { reload(h);return }
             h.ammunition[h.weaponSlot]-=1
         }
         h.cooldown=h.weaponInterval;h.recentShot=0.12
+        if let aimPoint=aimPoint {
+            let origin=V3(x:h.p.x,y:groundHeight(h.p)+h.elevation+1.2,z:h.p.z)
+            let direction=(aimPoint-origin).unit
+            let desired=origin+direction*h.weaponRange
+            var end=shotObstacle?(origin,desired) ?? desired
+            let obstruction=(end-origin).length
+            let hit=heroes.filter{$0.id != h.id && $0.alive}.compactMap { target -> (Hero,Double)? in
+                let feet=V3(x:target.p.x,y:groundHeight(target.p)+target.elevation,z:target.p.z)
+                guard let distance=capsuleHit(origin:origin,direction:direction,feet:feet),distance<obstruction else { return nil }
+                return (target,distance)
+            }.min{$0.1<$1.1}
+            if let (target,distance)=hit {
+                end=origin+direction*distance
+                if target.team != h.team && (!bot || rng.next()<0.62) { hurt(target,h.weaponDamage,attacker:h) }
+            }
+            if h.weapon?.isMelee != true { shots.append(Shot(from:origin.horizontal,to:end.horizontal,team:h.team,fromY:origin.y,toY:end.y)) }
+            return
+        }
         let direction=aim.unit
         let target=heroes.filter {
             guard $0.team != h.team && $0.alive else { return false }
@@ -286,7 +333,7 @@ final class Game {
                 if !free(p) { end=p; break }
             }
         }
-        if h.weapon?.isMelee != true { shots.append(Shot(from:h.p,to:end,team:h.team)) }
+        if h.weapon?.isMelee != true { shots.append(Shot(from:h.p,to:end,team:h.team,fromY:groundHeight(h.p)+h.elevation+1.2,toY:groundHeight(end)+1.2)) }
     }
     func ability(_ h: Hero) {
         guard h.ability <= 0, h.alive else { return }
@@ -326,7 +373,7 @@ final class Game {
             if h.id == 0 && !autopilot {
                 if input.jump { jump(h) }
                 h.facing=input.yaw; move(h,input.move,dt)
-                if input.fire { shoot(h,aim:V2(x:sin(h.facing),z:cos(h.facing)),bot:false) }
+                if input.fire { shoot(h,aim:V2(x:sin(h.facing),z:cos(h.facing)),bot:false,aimPoint:input.aimPoint) }
                 if input.ability { ability(h) }
                 continue
             }
@@ -341,7 +388,7 @@ final class Game {
                 if h.equipped.count>1 && (aim.length>h.weaponRange || h.reloadRemaining>0),let index=h.equipped.indices.first(where: { $0 != h.weaponSlot && h.equipped[$0].range>=aim.length && (h.equipped[$0].magazine==0 || h.ammunition[$0]>0) }) {
                     h.weaponSlot=index;h.reloadRemaining=0;h.cooldown=0.2
                 }
-                shoot(h,aim:aim,bot:true)
+                shoot(h,aim:aim,bot:true,aimPoint:shotObstacle == nil ? nil : V3(x:enemy.p.x,y:groundHeight(enemy.p)+enemy.elevation+1.1,z:enemy.p.z))
                 if h.hp<h.kind.hp*0.55 || (h.kind == .heavy && aim.length<9) { ability(h) }
                 // Retreat toward base at critical health, otherwise strafe between shots.
                 if h.hp<h.kind.hp*0.25 { move(h,bases[h.team]-h.p,dt) }
