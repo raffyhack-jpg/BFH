@@ -17,13 +17,13 @@ permission; the MIT license covers original code only.
 - Hero preview, faction/class selection, clothing categories, skin/hair palettes and saved loadouts.
 - Selectable original weapon models, two weapon slots, magazine counts, reloads and weapon animation poses.
 - Original sky dome/sky texture, capture flags and flagpole geometry.
-- Original Flash menu parchment, painted red navigation, olive panels, equipment frames, Play Now button, currency icons, animated faction HUD flags and scenic backdrop, imported without redrawing. Native menus use the original 800×600 layout fitted to the phone.
+- Original Flash menu parchment, painted red navigation, olive panels, equipment frames, Play Now button, currency icons, animated faction HUD flags and scenic backdrop, imported without redrawing. Original artwork fills the landscape screen; controls use phone-point layouts with 44-point menu hit targets. Tabs reuse one menu, inventory controller and animated hero scene.
 - Conquest: capture the map objectives, drain enemy tickets, respawn.
 - Capture the Flag: defend/return flags and escort carriers; three captures wins;
   dropped flags return after eighteen seconds.
 - Elimination: no respawn; eliminate the enemy squad.
 - Rocket Control: capture and hold one objective for sixty cumulative seconds.
-- Five minute match cap, results, pause/resume, health, score, kills/deaths.
+- Visible 15-minute round clock, explicit objective/time-limit result reasons, pause/resume, health, score, kills/deaths.
 - Class abilities: squad heal, temporary shield, dash.
 - Bots select mode objectives, navigate using A*, check line of sight, strafe,
   retreat, heal at base, use abilities, and shoot with imperfect accuracy. Flag carriers
@@ -34,8 +34,8 @@ permission; the MIT license covers original code only.
 ## Controls
 
 Left stick moves relative to camera. Drag the right side to look, or hold and drag
-FIRE to aim and shoot with one thumb. JUMP jumps; SWAP changes equipped weapon;
-RELOAD reloads the magazine. ABILITY activates the class skill. The follow camera
+FIRE to aim and shoot with one thumb. JUMP is on the right; tap either enlarged bottom weapon icon to select that slot;
+RELOAD reloads the magazine. The third bottom icon activates the class skill. Blue ALLY and red ENEMY nameplates identify visible characters. The follow camera
 keeps world up fixed and pulls in before obstructing scenery. Player shots follow the crosshair in 3D and intersect airborne character capsules,
 terrain and scenery; the shoulder camera converges on characters under the reticle. Pause opens Resume/New Match; backgrounding pauses.
 
@@ -202,3 +202,5 @@ playtest are still required before calling this release verified or polished.
 ## Interface reference and visual checks
 
 See [original interface references](docs/original-interface-reference.md) for the inspected screenshots/footage, asset mapping and fidelity gaps. `bash scripts/check_interface.sh` captures the running native menu, store, abilities and gameplay on an installed iPhone simulator.
+
+The mobile navigation check cycles inventory, weapons, store and abilities and asserts that the menu, hero and SceneKit scene retain their identity. It verifies full-screen paper bounds and menu targets at least 44 points high. All six original default kits are checked for explicit `cit_hands` geometry. Bot sensing is staggered, unchanged paths are reused, path jobs are limited per frame, player aiming rays run only for shots, and the covered game scene stops rendering in menus. Physical-device frame-rate and thermal behavior still require playtesting.

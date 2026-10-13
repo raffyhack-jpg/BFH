@@ -1,6 +1,6 @@
 # Original interface references
 
-This reconstruction uses the recovered 1.105 client sprites, not artwork generated to resemble the game. Screen layout is adapted to a landscape iPhone; it is not a port of the original Flash runtime or Refractor renderer.
+This reconstruction uses the recovered 1.105 client sprites, not artwork generated to resemble the game. Screen layout uses full-screen landscape iPhone bounds and native touch sizes; it is not a port of the original Flash runtime or Refractor renderer.
 
 ## References inspected
 
@@ -34,7 +34,7 @@ The Dribbble UI redesign was excluded as a reference for the original UI. The Ja
 
 ## Validation
 
-`scripts/check_interface.sh` builds the iOS Simulator app, installs it, launches the menu, store, abilities and gameplay scenes, and captures native screenshots. CI attaches those screenshots alongside the verified unsigned ARM64 IPA. These screenshots demonstrate rendering; they do not substitute for touch playtesting or a performance test on an iPhone.
+`scripts/check_interface.sh` builds the iOS Simulator app, installs it, launches the menu, store, abilities and gameplay scenes, and captures native screenshots. A separate navigation sequence verifies one persistent menu/hero scene, full-screen bounds, and 44-point menu hit targets; the resulting `mobile-menu-check.json` is included in the release. CI attaches those screenshots alongside the verified unsigned ARM64 IPA. These screenshots demonstrate rendering; they do not substitute for touch playtesting or a performance test on an iPhone.
 
 ## Remaining fidelity gaps
 
