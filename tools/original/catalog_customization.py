@@ -60,10 +60,10 @@ for name in items.entries:
         text=items.read(name).decode('latin1');print('ATLAS DEFAULT TEMPLATE',name,text)
         match=re.search(r'geometryTemplate.fileName\s+(\S+)',text,re.I)
         if match:
-            im=Image.open(io.BytesIO(client.read(match[1].lower().replace('objects/items/',''))));print('ATLAS DEFAULT IMAGE',im.size)
+            im=Image.open(io.BytesIO(client.read(match[1].strip(chr(34)).lower().replace('objects/items/',''))));print('ATLAS DEFAULT IMAGE',im.size)
 for stem in ['bri_m_body002','bri_m_legs002','bri_m_feet002']:
     name=next(n for n in client.entries if n.endswith('/'+stem+'.skinnedmesh'));path=Path('build')/(stem+'.skinnedmesh');path.write_bytes(client.read(name));mesh=BF2Mesh.load(str(path))
-    for mat,rig in zip(mesh.geoms[0].lods[0].materials,mesh.geoms[0].lods[0].rigs): print('ATLAS MESH DETAILS',stem,mat.technique,mat.fxfile,mat.vertices[0].blendweight,mat.vertices[0].blendindices,rig.bones[0].matrix.__dict__)
+    for mat,rig in zip(mesh.geoms[0].lods[0].materials,mesh.geoms[0].lods[0].rigs): print('ATLAS MESH DETAILS',stem,mat.technique,mat.fxfile,mat.vertices[0].blendweight,mat.vertices[0].blendindices,rig.bones[0].matrix.m)
 local=base/'Localization/strings.csv';print('LOCALIZATION SAMPLE',local.read_bytes()[:1800])
 print('CUSTOMIZATION INIT CONFIG','\n'.join(l for l in (base/'Init.con').read_text(errors='replace').splitlines() if any(t in l.lower() for t in ['custom','texture','item','soldier','color'])))
 shader=Archive(base/'Shaders_client.zip')
