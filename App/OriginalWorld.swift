@@ -60,9 +60,9 @@ final class OriginalWorld {
         let triangles=wallCells[Int(floor(p.x/8))*10000+Int(floor(p.z/8))] ?? []
         let feet=height(p)
         for t in triangles {
-            for offset:Float in [0.3,1.0,1.65] {
+            for offset in [Float(0.3),Float(1.0),Float(1.65)] {
                 let level=feet+offset
-                if level<min(t[1],t[4],t[7]) || level>max(t[1],t[4],t[7]) { continue }
+                if level<min(t[1],min(t[4],t[7])) || level>max(t[1],max(t[4],t[7])) { continue }
                 var points:[SIMD2<Float>]=[]
                 for (i,j) in [(0,3),(3,6),(6,0)] {
                     let dy=t[j+1]-t[i+1]
