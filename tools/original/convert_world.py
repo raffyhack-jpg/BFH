@@ -117,7 +117,7 @@ def main():
         if mx[1]-mn[1]>0.7 and not any(s in name for s in ['light','bridge','window','backdrop','chimney']):
             center=(mn+mx)/2; half=(mx-mn)/2
             c,s=math.cos(yaw),math.sin(yaw)
-            collision.append({'center':[p[0]+center[0]*c+center[2]*s,-p[2]-center[0]*s+center[2]*c], 'half':[half[0]*abs(c)+half[2]*abs(s),half[0]*abs(s)+half[2]*abs(c)]})
+            collision.append({'center':[p[0]+center[0]*c+center[2]*s,-p[2]-center[0]*s+center[2]*c], 'half':[half[0],half[2]],'angle':yaw})
     weapons={}
     for faction,names in [('royal',['bri_smg_sten','bri_mg_lewis','bri_sniperrifle_leeenfield']),('national',['ger_smg_mp40','ger_mg_mg40','ger_sniperrifle_gewehr43'])]:
         for kind,name in zip(['soldier','heavy','scout'],names):

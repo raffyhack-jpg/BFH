@@ -19,7 +19,17 @@ enum HeroClass: String, CaseIterable {
     var interval: Double { self == .scout ? 0.8 : self == .heavy ? 0.18 : 0.3 }
     var range: Double { self == .scout ? 28 : self == .heavy ? 17 : 22 }
 }
-struct Block { var center: V2; var half: V2 }
+struct Block {
+    var center:V2;var half:V2;var angle:Double=0
+    var axisHalf:V2 {
+        let c=abs(cos(angle)),s=abs(sin(angle))
+        return V2(x:half.x*c+half.z*s,z:half.x*s+half.z*c)
+    }
+    func contains(_ p:V2)->Bool {
+        let d=p-center,c=cos(angle),s=sin(angle)
+        return abs(d.x*c-d.z*s)<half.x+0.45 && abs(d.x*s+d.z*c)<half.z+0.45
+    }
+}
 struct MapLayout {
     var bases:[V2],objectives:[V2],blocks:[Block]
     var extent:Double,gridStep:Double
@@ -54,6 +64,7 @@ final class Game {
     var bases = [V2(x:-24,z:0),V2(x:24,z:0)]
     var mapLayout:MapLayout?
     var spatialBlocks:[Int:[Block]]=[:]
+    var navigationEdges:[Int:[Int]]=[:]
     var objectives: [Objective] = []
     var flags: [Flag] = []
     var blocks: [Block] = [
@@ -69,8 +80,9 @@ final class Game {
         mapLayout=layout
         if let layout=layout { bases=layout.bases; blocks=layout.blocks }
         for b in blocks {
-            for x in Int(floor((b.center.x-b.half.x-1)/8))...Int(floor((b.center.x+b.half.x+1)/8)) {
-                for z in Int(floor((b.center.z-b.half.z-1)/8))...Int(floor((b.center.z+b.half.z+1)/8)) { spatialBlocks[x*10000+z,default:[]].append(b) }
+            let bounds=b.axisHalf
+            for x in Int(floor((b.center.x-bounds.x-1)/8))...Int(floor((b.center.x+bounds.x+1)/8)) {
+                for z in Int(floor((b.center.z-bounds.z-1)/8))...Int(floor((b.center.z+bounds.z+1)/8)) { spatialBlocks[x*10000+z,default:[]].append(b) }
             }
         }
         objectives = layout?.objectives.map{Objective(p:$0)} ?? [Objective(p:V2(x:-17,z:0)),Objective(p:.zero),Objective(p:V2(x:17,z:0))]
@@ -88,7 +100,7 @@ final class Game {
         let extent=mapLayout?.extent ?? 28
         let within=abs(p.x)<extent && abs(p.z)<(mapLayout == nil ? 18 : extent)
         let nearby=spatialBlocks[Int(floor(p.x/8))*10000+Int(floor(p.z/8))] ?? []
-        return within && (mapLayout?.walkable(p) ?? true) && !nearby.contains { abs(p.x-$0.center.x)<$0.half.x+0.45 && abs(p.z-$0.center.z)<$0.half.z+0.45 }
+        return within && (mapLayout?.walkable(p) ?? true) && !nearby.contains { $0.contains(p) }
     }
     func nearestFree(_ p:V2) -> V2 {
         if free(p) { return p }
@@ -153,11 +165,18 @@ final class Game {
             }
             closed.insert(current)
             let p=point(current)
-            for d in [V2(x:1,z:0),V2(x:-1,z:0),V2(x:0,z:1),V2(x:0,z:-1)] {
-                let q=p+d*step; guard free(q) && visible(p,q) else { continue }
-                let k=key(q); guard !closed.contains(k) else { continue }
-                let c=(cost[current] ?? 0)+step
-                if c < (cost[k] ?? 1e9) { cost[k]=c; parent[k]=current; push((k,c+point(k).distance(goal))) }
+            if navigationEdges[current]==nil {
+                var neighbors:[Int]=[]
+                for dx in -1...1 { for dz in -1...1 where dx != 0 || dz != 0 {
+                    let q=p+V2(x:Double(dx)*step,z:Double(dz)*step)
+                    if free(q) && visible(p,q) { neighbors.append(key(q)) }
+                } }
+                navigationEdges[current]=neighbors
+            }
+            for k in navigationEdges[current] ?? [] {
+                guard !closed.contains(k) else { continue }
+                let c=(cost[current] ?? 0)+p.distance(point(k))
+                if c < (cost[k] ?? 1e9) { cost[k]=c;parent[k]=current;push((k,c+point(k).distance(goal))) }
             }
         }
         return []

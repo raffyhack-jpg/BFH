@@ -5,7 +5,7 @@ import CoreGraphics
 struct OriginalPart:Decodable { let vertexOffset:Int,vertexCount:Int,indexOffset:Int,indexCount:Int; let texture:String?; let alpha:Bool }
 struct OriginalMesh:Decodable { let file:String; let parts:[OriginalPart]; let min:[Float],max:[Float] }
 struct OriginalInstance:Decodable { let mesh:String; let position:[Float],rotation:[Float] }
-struct OriginalBlock:Decodable { let center:[Double],half:[Double] }
+struct OriginalBlock:Decodable { let center:[Double],half:[Double];let angle:Double? }
 struct OriginalMap:Decodable {
     let name:String,meshAssets:[String:OriginalMesh],instances:[OriginalInstance],weapons:[String:String]
     let blocks:[OriginalBlock],bases:[[Double]],objectives:[[Double]],flags:[String:String],sky:String
@@ -81,7 +81,7 @@ final class OriginalWorld {
         return try model(name)
     }
     var layout:MapLayout {
-        MapLayout(bases:map.bases.map{V2(x:$0[0],z:$0[1])},objectives:map.objectives.map{V2(x:$0[0],z:$0[1])},blocks:map.blocks.map{Block(center:V2(x:$0.center[0],z:$0.center[1]),half:V2(x:$0.half[0],z:$0.half[1]))},extent:240,gridStep:3,walkable:{ [self] p in
+        MapLayout(bases:map.bases.map{V2(x:$0[0],z:$0[1])},objectives:map.objectives.map{V2(x:$0[0],z:$0[1])},blocks:map.blocks.map{Block(center:V2(x:$0.center[0],z:$0.center[1]),half:V2(x:$0.half[0],z:$0.half[1]),angle:$0.angle ?? 0)},extent:240,gridStep:1.5,walkable:{ [self] p in
             height(p)>Float(map.waterHeight)+0.4 && abs(height(p+V2(x:1,z:0))-height(p-V2(x:1,z:0)))<1.8 && abs(height(p+V2(x:0,z:1))-height(p-V2(x:0,z:1)))<1.8
         })
     }

@@ -33,7 +33,11 @@ let mapGame=Game(mode:.conquest,hero:.soldier,layout:original.layout)
 for base in mapGame.bases { precondition(mapGame.free(base),"Original spawn is blocked") }
 for objective in mapGame.objectives {
     precondition(mapGame.free(objective.p),"Original objective is blocked")
-    for base in mapGame.bases { precondition(!mapGame.route(base,objective.p).isEmpty,"Bots cannot reach an objective on original terrain") }
+    for base in mapGame.bases {
+        let path=mapGame.route(base,objective.p)
+        print("Original map route: base \\(base) -> objective \\(objective.p), \\(path.count) waypoints")
+        precondition(!path.isEmpty,"Bots cannot reach an objective on original terrain")
+    }
 }
 print("Validated original map: \(original.map.instances.count) placements, six weapons, terrain sampling and connected objective routes")
 if let device=MTLCreateSystemDefaultDevice() {
