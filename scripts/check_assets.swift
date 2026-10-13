@@ -99,3 +99,45 @@ for faction in ["royal", "national"] {
     precondition(!actor.node.isHidden && actor.deathTime==0,"Respawn did not reset pose")
     print("Validated original \(faction): 74-bone skin, run/fire playback, death/respawn")
 }
+
+let wardrobe=try OriginalWardrobe(directory:URL(fileURLWithPath:"Assets/Wardrobe",isDirectory:true))
+precondition(wardrobe.catalog.items.count>1000,"Original wardrobe is incomplete")
+precondition(wardrobe.catalog.weapons.count>200,"Original weapon catalog missing")
+precondition(wardrobe.catalog.colors.count==14,"Original color tables missing")
+for faction in 1...2 {for kind in HeroClass.allCases {
+    let loadout=wardrobe.defaults(faction,kind)
+    precondition(loadout.clothing.count>=4 && loadout.weapons.count==2,"Original default kit is incomplete")
+    let actor=try AnimatedCharacter(faction==1 ? "royal" : "national",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
+    try wardrobe.apply(loadout,faction:faction,to:actor)
+    for _ in 0..<10 {actor.update(1.0/30,position:.zero,moving:true,firing:false,ability:false,alive:true,jumping:true)}
+    precondition(actor.asset.clips["jumpLoop"] != nil,"Original jump animation missing")
+    print("Validated original outfit: faction \(faction), \(kind.rawValue), \(loadout.clothing), weapons \(loadout.weapons)")
+}}
+for (_,template) in wardrobe.catalog.templates {if let file=template.mesh {
+    for part in try wardrobe.parts(file) {
+        let count=part.positions.count/3
+        precondition(count>0 && part.weights.count==count*2 && part.indices.count==count*2,"Clothing weights missing")
+        precondition(part.boneIDs.allSatisfy{$0>=0 && $0<74} && part.indices.allSatisfy{Int($0)<part.boneIDs.count},"Clothing references an invalid bone")
+        precondition(part.faces.allSatisfy{$0>=0 && $0<count},"Clothing topology invalid")
+    }
+}}
+print("Validated wardrobe: \(wardrobe.catalog.items.count) original items, \(wardrobe.catalog.weapons.count) original weapons")
+if let device=MTLCreateSystemDefaultDevice() {
+    let scene=SCNScene();scene.background.contents=NSColor(calibratedWhite:0.14,alpha:1)
+    let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=800;scene.rootNode.addChildNode(ambient)
+    let sun=SCNNode();sun.light=SCNLight();sun.light?.type = .directional;sun.light?.intensity=1000;sun.eulerAngles=SCNVector3(-0.5,-0.4,0);scene.rootNode.addChildNode(sun)
+    for faction in 1...2 {
+        let actor=try AnimatedCharacter(faction==1 ? "royal" : "national",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
+        try wardrobe.apply(wardrobe.defaults(faction,.soldier),faction:faction,to:actor)
+        actor.node.position.x=faction==1 ? -1.2 : 1.2;actor.node.simdEulerAngles.y=Float.pi
+        for _ in 0..<10 {actor.update(1.0/30,position:.zero,moving:false,firing:false,ability:false,alive:true)}
+        scene.rootNode.addChildNode(actor.node)
+    }
+    let camera=SCNNode();camera.camera=SCNCamera();camera.camera?.fieldOfView=34;camera.position=SCNVector3(0,1.2,6.5);camera.look(at:SCNVector3(0,1.05,0));scene.rootNode.addChildNode(camera)
+    let renderer=SCNRenderer(device:device,options:nil);renderer.scene=scene;renderer.pointOfView=camera
+    let image=renderer.snapshot(atTime:0,with:CGSize(width:960,height:540),antialiasingMode:.multisampling4X)
+    if let tiff=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:tiff) {
+        if let png=bitmap.representation(using:.png,properties:[:]) {try png.write(to:URL(fileURLWithPath:"build/original-wardrobe-preview.png"))}
+        if let jpeg=bitmap.representation(using:.jpeg,properties:[.compressionFactor:0.65]) {print("WARDROBE_VISUAL_CHECK="+jpeg.base64EncodedString())}
+    }
+}

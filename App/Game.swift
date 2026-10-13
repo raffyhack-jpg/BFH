@@ -38,11 +38,22 @@ struct MapLayout {
 }
 struct Objective { var p: V2; var progress: Double = 0; var owner: Int = -1 }
 struct Flag { var home: V2; var p: V2; var carrier: Int?; var droppedAt: Double = 0 }
+struct WeaponProfile {
+    let id:Int,name:String
+    let damage:Double,interval:Double,range:Double
+    let magazine:Int,reloadTime:Double
+}
 final class Hero {
     let id: Int; let team: Int; let kind: HeroClass
     var p: V2; var facing: Double = 0; var hp: Double
     var respawn: Double = 0; var invulnerable: Double = 2
     var elevation=0.0,verticalVelocity=0.0
+    var equipped:[WeaponProfile]=[],weaponSlot=0,ammunition:[Int]=[],reloadRemaining=0.0
+    var weapon:WeaponProfile? { equipped.indices.contains(weaponSlot) ? equipped[weaponSlot] : nil }
+    var weaponInterval:Double { weapon?.interval ?? kind.interval }
+    var weaponDamage:Double { weapon?.damage ?? kind.damage }
+    var weaponRange:Double { weapon?.range ?? kind.range }
+    func equip(_ weapons:[WeaponProfile]) { equipped=weapons;ammunition=weapons.map{$0.magazine};weaponSlot=0;reloadRemaining=0 }
     var cooldown: Double = 0; var ability: Double = 0
     var think: Double = 0; var path: [V2] = []; var target: V2 = .zero
     var kills = 0; var deaths = 0; var lastAttacker: Int?
@@ -77,7 +88,7 @@ final class Game {
     var score = [0.0,0.0]; var tickets = [70.0,70.0]
     var elapsed = 0.0; var winner: Int?; var shots: [Shot] = []; var message = ""
     var rng = RNG(); var paused = false
-    init(mode: Mode, hero: HeroClass, seed: UInt64 = 42, layout:MapLayout?=nil) {
+    init(mode: Mode, hero: HeroClass, seed: UInt64 = 42, layout:MapLayout?=nil,playerTeam:Int=0) {
         self.mode=mode; rng.state=seed
         mapLayout=layout
         if let layout=layout { bases=layout.bases; blocks=layout.blocks }
@@ -93,7 +104,7 @@ final class Game {
         for i in objectives.indices { objectives[i].p=nearestFree(objectives[i].p) }
         flags = [Flag(home:bases[0],p:bases[0]),Flag(home:bases[1],p:bases[1])]
         for i in 0..<16 {
-            let team = i < 8 ? 0 : 1
+            let team = i < 8 ? playerTeam : 1-playerTeam
             let kind = i == 0 ? hero : HeroClass.allCases[i%3]
             heroes.append(Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%8)-3.5))))
         }
@@ -241,22 +252,34 @@ final class Game {
             message=attacker.id == 0 ? "Eliminated enemy" : h.id == 0 ? "Respawning…" : ""
         }
     }
+    func reload(_ h:Hero) {
+        guard h.alive,h.reloadRemaining<=0,let weapon=h.weapon,h.ammunition[h.weaponSlot]<weapon.magazine else { return }
+        h.reloadRemaining=weapon.reloadTime
+    }
+    func switchWeapon(_ h:Hero) {
+        guard h.alive,h.equipped.count>1 else { return }
+        h.weaponSlot=(h.weaponSlot+1)%h.equipped.count;h.reloadRemaining=0;h.cooldown=0.2
+    }
     func shoot(_ h: Hero, aim: V2, bot: Bool) {
-        guard h.cooldown <= 0 else { return }
-        h.cooldown=h.kind.interval
+        guard h.cooldown <= 0,h.reloadRemaining<=0 else { return }
+        if h.weapon != nil {
+            if h.ammunition[h.weaponSlot]<=0 { reload(h);return }
+            h.ammunition[h.weaponSlot]-=1
+        }
+        h.cooldown=h.weaponInterval
         let direction=aim.unit
         let target=heroes.filter {
             guard $0.team != h.team && $0.alive else { return false }
             let d=$0.p-h.p; let alignment=d.unit.x*direction.x+d.unit.z*direction.z
-            return d.length<h.kind.range && alignment>0.96 && visible(h.p,$0.p)
+            return d.length<h.weaponRange && alignment>0.96 && visible(h.p,$0.p)
         }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
-        var end=h.p+direction*h.kind.range
+        var end=h.p+direction*h.weaponRange
         if let target=target {
             end=target.p
             // Bots have imperfect aim; class rate of fire is also enforced.
-            if !bot || rng.next() < 0.62 { hurt(target,h.kind.damage,attacker:h) }
+            if !bot || rng.next() < 0.62 { hurt(target,h.weaponDamage,attacker:h) }
         } else {
-            for i in 1...Int(h.kind.range*2) {
+            for i in 1...Int(h.weaponRange*2) {
                 let p=h.p+direction*(Double(i)/2)
                 if !free(p) { end=p; break }
             }
@@ -284,11 +307,15 @@ final class Game {
                 h.verticalVelocity-=20*dt;h.elevation=max(0,h.elevation+h.verticalVelocity*dt)
                 if h.elevation==0 { h.verticalVelocity=0 }
             }
+            if h.reloadRemaining>0 {
+                h.reloadRemaining=max(0,h.reloadRemaining-dt)
+                if h.reloadRemaining==0,let weapon=h.weapon { h.ammunition[h.weaponSlot]=weapon.magazine }
+            }
             h.cooldown=max(0,h.cooldown-dt); h.ability=max(0,h.ability-dt); h.invulnerable=max(0,h.invulnerable-dt)
             if !h.alive {
                 h.respawn-=dt
                 if h.respawn<=0 && mode != .elimination {
-                    h.hp=h.kind.hp; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.elevation=0;h.verticalVelocity=0
+                    h.hp=h.kind.hp;h.ammunition=h.equipped.map{$0.magazine};h.reloadRemaining=0; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.elevation=0;h.verticalVelocity=0
                 }
                 continue
             }
@@ -304,7 +331,7 @@ final class Game {
             if h.think<=0 {
                 h.think=0.55+rng.next()*0.3; h.target=objective(for:h); h.path=route(h.p,h.target)
             }
-            let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<h.kind.range && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
+            let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<h.weaponRange && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
             if let enemy=enemy {
                 let aim=enemy.p-h.p; h.facing=atan2(aim.x,aim.z)
                 shoot(h,aim:aim,bot:true)

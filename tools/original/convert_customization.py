@@ -12,6 +12,7 @@ def main():
     base=Path(sys.argv[1]);out=Path(sys.argv[2]);out.mkdir(parents=True,exist_ok=True)
     for folder in ['meshes','textures','icons']: (out/folder).mkdir(exist_ok=True)
     server=Archive(base/'Objects/Items_server.zip');client=Archive(base/'Objects/Items_client.zip');menu=Archive(base/'Menu_client.zip')
+    print('ORIGINAL VECTORS CONFIG',server.read('vectors.xml').decode('utf8',errors='replace')[:7000])
     templates={};sources=[];mesh_paths={Path(n).stem:n for n in client.entries if n.endswith('.skinnedmesh')}
     def record(archive,name,data): sources.append({'archive':str(archive.path.relative_to(base)),'entry':name,'sha256':hashlib.sha256(data).hexdigest()})
     def png(archive,name,folder):
@@ -28,14 +29,17 @@ def main():
             for v in mat.vertices:
                 p=v.position;n=v.normal;uv=v.texcoord0;w=v.blendweight[0] if v.blendweight else 1
                 part['positions']+= [p[0],p[1],-p[2]];part['normals'] += [n[0],n[1],-n[2]];part['uv'] += [uv[0],1-uv[1]]
-                part['weights'] += [w,1-w];part['indices'] += list(v.blendindices[:2]) if v.blendindices else [0,0]
+                weights=[w,1-w];indices=list(v.blendindices[:2]) if v.blendindices else [0,0]
+                for i in range(2):
+                    if weights[i]<0.000001:indices[i]=0
+                part['weights'] += weights;part['indices'] += indices
             for f in mat.faces:part['faces'] += [f[0],f[2],f[1]]
             for b in rig.bones:
                 # BFH stores Direct3D row-vector inverse bind matrices. The same
                 # flat row ordering becomes SceneKit's column-vector transpose.
                 m=np.array(b.matrix.m);s=np.diag([1,1,-1,1]);part['inverseBind'].append((s@m@s).flatten().tolist())
             assert all(0<=b<74 for b in part['boneIDs']),name
-            assert max(part['indices'])<len(part['boneIDs']),name
+            assert max(part['indices'])<len(part['boneIDs']),str((name,max(part['indices']),part['boneIDs']))
             parts.append(part)
         assert parts,name
         file='meshes/'+name+'.json';(out/file).write_text(json.dumps(parts,separators=(',',':')));return file
@@ -54,13 +58,13 @@ def main():
             image,size=png(client,file,'textures');templates[key]={'kind':'texture','materialType':kind,'mesh':None,'texture':image,'coordinate':[int(v) for v in coord.split('/')],'size':size}
     localization={};local=base/'Localization/strings.csv'
     if local.exists():
-        data=local.read_bytes();text=data.decode('utf16' if data[:2] in [b'\xff\xfe',b'\xfe\xff'] else 'utf-8-sig',errors='replace');dialect=csv.Sniffer().sniff(text[:20000],delimiters=',;\t');rows=list(csv.reader(io.StringIO(text),dialect))
+        data=local.read_bytes();text=data.decode('utf16' if data[:2] in [b'\xff\xfe',b'\xfe\xff'] else 'utf-8-sig',errors='replace');rows=list(csv.reader(io.StringIO(text),delimiter='\t'))
         print('LOCALIZATION CSV HEADER',rows[:2])
-        english=next((i for i,h in enumerate(rows[0]) if h.lower() in ['english','en','en_us','en-us']),1)
+        english=next((i for i,h in enumerate(rows[0]) if h.lower() in ['english','en','en_us','en-us','eng_us']),1)
         for row in rows[1:]:
-            if len(row)>english:localization[row[0].strip()]=row[english].strip()
+            if len(row)>english:localization[row[0].strip().lower()]=row[english].strip()
     icon_paths={Path(n).stem.lower():n for n in menu.entries if '/images/items/' in n and n.endswith(('.dds','.png','.tga'))}
-    def title(id,fallback):return localization.get('WEST_Custom_Item_'+str(id),localization.get('WEST_CUSTOM_ITEM_'+str(id),fallback))
+    def title(id,fallback):return localization.get('west_custom_item_'+str(id),fallback)
     def icon(id):
         path=icon_paths.get('item'+str(id)) or icon_paths.get(str(id))
         return png(menu,path,'icons')[0] if path else None

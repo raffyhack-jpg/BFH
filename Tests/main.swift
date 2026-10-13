@@ -53,3 +53,13 @@ for mode in Mode.allCases {
     print("Bots completed \(mode.rawValue): \(Int(game.elapsed))s, winner \(game.winner!), score \(game.score)")
 }
 print("All core checks passed")
+
+let equipmentGame=Game(mode:.conquest,hero:.soldier,playerTeam:1)
+precondition(equipmentGame.heroes[0].team==1 && equipmentGame.heroes.filter{$0.team==1}.count==8)
+let equipped=equipmentGame.heroes[0]
+equipped.equip([WeaponProfile(id:1,name:"SMG",damage:19,interval:0.2,range:25,magazine:2,reloadTime:1),WeaponProfile(id:2,name:"Pistol",damage:22,interval:0.4,range:24,magazine:8,reloadTime:2)])
+equipmentGame.shoot(equipped,aim:V2(x:1,z:0),bot:false);precondition(equipped.ammunition[0]==1)
+equipmentGame.reload(equipped);for _ in 0..<10 {equipmentGame.update(0.05,input:Input())};precondition(equipped.ammunition[0]==1 && equipped.reloadRemaining>0)
+for _ in 0..<11 {equipmentGame.update(0.05,input:Input())};precondition(equipped.ammunition[0]==2 && equipped.reloadRemaining==0)
+equipmentGame.switchWeapon(equipped);precondition(equipped.weapon?.id==2 && equipped.ammunition[1]==8)
+print("Validated selectable faction, weapon magazines, reload timing and two equipment slots")
