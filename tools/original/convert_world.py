@@ -163,6 +163,29 @@ def main():
     skytexture=texture(gamecommon,'common/textures/sky/sky_heat.dds')
     for part in meshes[sky]['parts']: part['texture']=skytexture
     ui=out.parent/'UI';ui.mkdir(exist_ok=True)
+    ui_assets=[]
+    for name in sorted(menu.entries):
+        if not name.endswith(('.png','.dds','.tga')) or '/images/items/' in name:continue
+        if not any(k in name.lower() for k in ['hud/','ingame/','currency','valor','battlefund','rank','button','score','health']):continue
+        try:
+            raw=menu.read(name);im=Image.open(io.BytesIO(raw)).convert('RGBA')
+            if im.width>2048 or im.height>2048:continue
+            filename='original-'+hashlib.sha256(name.encode()).hexdigest()[:16]+'.png'
+            im.save(ui/filename,compress_level=6);record(menu,name,raw)
+            ui_assets.append({'name':name,'file':filename,'width':im.width,'height':im.height})
+        except (OSError,ValueError):continue
+    native_fonts=[]
+    font_archives=[menu]
+    if (base/'Fonts_client.zip').exists():font_archives.append(Archive(base/'Fonts_client.zip'))
+    for archive in font_archives:
+        for name in archive.entries:
+            if not name.lower().endswith(('.ttf','.otf')):continue
+            raw=archive.read(name);filename='font-'+hashlib.sha256(raw).hexdigest()[:16]+Path(name).suffix.lower()
+            (ui/filename).write_bytes(raw);record(archive,name,raw);native_fonts.append(filename)
+    (ui/'fonts.json').write_text(json.dumps(native_fonts))
+    (ui/'manifest.json').write_text(json.dumps(ui_assets,separators=(',',':')))
+    print('Recovered original HUD/menu artwork:',len(ui_assets),flush=True)
+
     for source,destination in [('External/FlashMenu/images/background/logo.png','logo.png'),('External/FlashMenu/images/background/bg_menu.png','menu.png')]:
         data=menu.read(source);record(menu,source,data);(ui/destination).write_bytes(data)
     # Original terrain grid, 2 metres per sample. Reflect Z consistently with the meshes.

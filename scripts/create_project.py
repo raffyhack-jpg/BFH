@@ -6,8 +6,8 @@ root = Path(__file__).resolve().parent.parent
 info = {
  'CFBundleDevelopmentRegion':'en', 'CFBundleExecutable':'$(EXECUTABLE_NAME)',
  'CFBundleIdentifier':'$(PRODUCT_BUNDLE_IDENTIFIER)', 'CFBundleInfoDictionaryVersion':'6.0',
- 'CFBundleName':'PocketFront', 'CFBundlePackageType':'APPL', 'CFBundleShortVersionString':'0.4.0',
- 'CFBundleVersion':'4', 'LSRequiresIPhoneOS':True,
+ 'CFBundleName':'PocketFront', 'CFBundlePackageType':'APPL', 'CFBundleShortVersionString':'0.5.0',
+ 'CFBundleVersion':'5', 'LSRequiresIPhoneOS':True,
  'UISupportedInterfaceOrientations':['UIInterfaceOrientationLandscapeLeft','UIInterfaceOrientationLandscapeRight'],
  'UILaunchScreen':{}, 'UIRequiredDeviceCapabilities':['arm64','metal'], 'UIRequiresFullScreen':True,
 }

@@ -74,6 +74,16 @@ def main():
     def icon(id):
         path=icon_paths.get('item'+str(id)) or icon_paths.get(str(id))
         return png(menu,path,'icons')[0] if path else None
+    def commerce(item):
+        # Preserve explicit source fields only; backend prices were not bundled in every client.
+        def integer(*keys):
+            for key in keys:
+                raw=item.get(key) or item.findtext(key)
+                if raw and raw.strip().isdigit():return int(raw)
+            return None
+        return {'minimumLevel':integer('minimumLevel','minLevel','requiredLevel','level'),
+                'valorPrice':integer('valorPrice','vpPrice'),
+                'fundsPrice':integer('fundsPrice','bfPrice')}
     items=[];unresolved=[]
     for item in ET.fromstring(server.read('items.xml')).findall('.//item'):
         id=int(item.get('id'));refs=[];missing=[]
@@ -82,7 +92,7 @@ def main():
             if key in templates:refs.append({'name':key,'layer':int(t.get('layer','0'))})
             elif key:missing.append(key)
         if missing:unresolved.append({'id':id,'templates':missing})
-        if refs and not missing:items.append({'id':id,'name':title(id,item.findtext('displayName') or str(id)),'faction':int(item.findtext('faction','0')),'kits':int(item.findtext('kits','7')),'slot':int(item.findtext('slot','0')),'templates':refs,'icon':icon(id)})
+        if refs and not missing:items.append({'id':id,'name':title(id,item.findtext('displayName') or str(id)),'faction':int(item.findtext('faction','0')),'kits':int(item.findtext('kits','7')),'slot':int(item.findtext('slot','0')),'templates':refs,'icon':icon(id),**commerce(item)})
     defaults={}
     for team in ET.fromstring(server.read('defaultcustomization.xml')).findall('.//team'):
         # Engine team 2=Royal, team 1=National; item faction 1=Royal,2=National.
@@ -105,7 +115,7 @@ def main():
     for item in ET.fromstring(server.read('weapons.xml')).findall('.//item'):
         id=int(item.get('id'));d=weapondefs.get(id)
         if not d or d["model"] not in world["meshAssets"]:continue
-        weapons.append({'id':id,'name':title(id,item.findtext('displayName') or str(id)),'faction':int(item.findtext('faction','0')),'kits':int(item.findtext('kits','7')),'weaponClass':int(item.findtext('class','0')),'icon':icon(id),**d})
+        weapons.append({'id':id,'name':title(id,item.findtext('displayName') or str(id)),'faction':int(item.findtext('faction','0')),'kits':int(item.findtext('kits','7')),'weaponClass':int(item.findtext('class','0')),'icon':icon(id),**d,**commerce(item)})
     catalog={'items':items,'templates':templates,'defaults':defaults,'colors':colors,'weapons':weapons}
     (out/'catalog.json').write_text(json.dumps(catalog,separators=(',',':')))
     soldiers=Archive(base/'Objects/Soldiers_server.zip')

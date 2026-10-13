@@ -165,3 +165,36 @@ original definitions. Damage/range are still prototype values, projectile behavi
 and abilities are incomplete, and character texture composition needs device QA.
 The game remains an offline prototype with one map; it is not a complete identical
 recreation of every original mode, vehicle, unlock, audio cue or online feature.
+
+## Combat UI and offline career
+
+The native HUD now has outlined floating damage values, hit flashes/sparks,
+colored ticket banners, objective badges, health/ammo meters, an XP bar,
+elimination/capture messages and level-up feedback. The main menu presents the
+original animated hero next to equipment and career controls. These are native
+recreations of the visual language, not a pixel-identical port of the Flash HUD.
+The original UI converter exports matching HUD/menu artwork and any native
+TTF/OTF fonts available in the client, with source hashes; unsupported packed
+Flash/bitmap fonts still use a native font fallback.
+
+Careers persist independently for each faction/class. XP is earned from actual
+damage (excluding overkill and invulnerable hits), eliminations and objectives.
+Levels use the historical 1–30 cumulative XP table documented at
+https://bfh-info.cs-heroes.cz/en/game/level/ . The starting Hero Point is assigned
+to the class skill; even levels grant another point. The implemented prototype
+class skill can be upgraded through five ranks. This is not the full original
+ability tree or post-level-30 rank system.
+
+The wardrobe is also a local shop: defaults and existing saved equipment are
+grandfathered as owned, while new purchases check ownership, source level
+requirements and available currency before equipping. Explicit VP/Battlefunds
+price fields are preserved when present. Missing prices use clearly labeled
+local fallback prices (250 VP for clothes, 500 VP for weapons). Match VP payouts
+and the three starter missions are offline balancing choices; they are not
+claimed as original historical commerce rules. Battlefunds have no real-money
+top-up in this offline app. Rentals, historical store promotions, cash payments
+and the full original mission catalog remain unfinished.
+
+Career saves, purchases, Hero Point spending and repeated match reward claims
+are covered by game-core checks. A successful native build and device visual
+playtest are still required before calling this release verified or polished.

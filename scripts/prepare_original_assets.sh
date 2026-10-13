@@ -24,6 +24,7 @@ innoextract --silent --output-dir build/original-client/extracted \
   --include app/mods/bfheroes/Objects/Weapons_server.zip \
   --include app/mods/bfheroes/Common_client.zip \
   --include app/mods/bfheroes/Menu_client.zip \
+  --include app/mods/bfheroes/Fonts_client.zip \
   --include app/mods/bfheroes/Shaders_client.zip \
   --include app/mods/bfheroes/Localization \
   --include app/mods/bfheroes/Init.con \

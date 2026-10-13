@@ -175,3 +175,35 @@ check(coveredRoute != safeReturn.flags[0].home && safeReturn.free(coveredRoute),
 courier.p=coveredRoute
 check(safeReturn.objective(for:courier)==safeReturn.flags[0].home,"Carrier must continue home after clearing the flank")
 print("Validated covered carrier returns and bounded raider regrouping")
+
+var progress=HeroCareer()
+check(progress.level==1 && progress.heroPoints==0,"A new hero must start at level one with its initial point assigned")
+progress.earn(600)
+check(progress.level==2 && progress.heroPoints==1 && progress.levelFraction==0,"Level two threshold and Hero Point grant failed")
+check(progress.upgradeAbility() && progress.abilityRank==2 && progress.heroPoints==0,"Hero Point spending failed")
+check(!progress.upgradeAbility(),"Ability upgrade must not overspend Hero Points")
+progress.valor=300
+check(!progress.purchase(id:42,minimumLevel:3,valorPrice:250,fundsPrice:nil) && progress.valor==300,"Locked item must not consume currency")
+check(progress.purchase(id:42,minimumLevel:2,valorPrice:250,fundsPrice:nil) && progress.valor==50 && progress.owned.contains(42),"Purchase must debit once and grant ownership")
+check(!progress.purchase(id:42,minimumLevel:2,valorPrice:250,fundsPrice:nil) && progress.valor==50,"Owned item must not be charged twice")
+progress.funds=100
+check(!progress.purchase(id:43,minimumLevel:1,valorPrice:250,fundsPrice:50) && progress.funds==100,"Insufficient VP must not silently consume premium currency")
+check(progress.purchase(id:43,minimumLevel:1,valorPrice:nil,fundsPrice:50) && progress.funds==50,"Explicit Battlefunds purchase must debit the requested currency")
+let reward=progress.finishMatch(id:"round-one",kills:10,captures:3,won:true),balance=progress.valor
+check(reward>0 && progress.claimedMissions.count==3,"Completed career missions must reward VP")
+check(progress.finishMatch(id:"round-one",kills:10,captures:3,won:true)==0 && progress.valor==balance,"Match rewards must be idempotent")
+let serialized=try! JSONEncoder().encode(progress),restored=try! JSONDecoder().decode(HeroCareer.self,from:serialized)
+check(restored.owned==progress.owned && restored.valor==progress.valor && restored.heroPoints==progress.heroPoints,"Career and ownership persistence round trip failed")
+progress.earn(4_000_000)
+check(progress.level==30 && progress.levelFraction==1,"Career level must cap at thirty")
+
+let hitEvents=Game(mode:.conquest,hero:.soldier)
+let shooter=hitEvents.heroes[0],enemyEvent=hitEvents.heroes[8]
+enemyEvent.invulnerable=1
+hitEvents.hurt(enemyEvent,10000,attacker:shooter)
+check(hitEvents.feedback.isEmpty && shooter.matchXP==0,"Invulnerability must not award damage XP or visual hit numbers")
+enemyEvent.invulnerable=0;let remainingHP=Int(enemyEvent.hp)
+hitEvents.hurt(enemyEvent,10000,attacker:shooter)
+check(hitEvents.feedback.last?.damage==remainingHP && hitEvents.feedback.last?.killed==true,"Hit feedback must report actual damage, not overkill")
+check(shooter.matchXP==remainingHP+50 && hitEvents.scoreFeedback.last?.reason=="ENEMY ELIMINATED","Actual damage and elimination XP events failed")
+print("Validated persistent careers, original level thresholds, Hero Points, purchases, missions and combat feedback")

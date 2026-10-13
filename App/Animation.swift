@@ -108,11 +108,11 @@ final class AnimatedCharacter {
 }
 
 struct ClothingRef:Decodable { let name:String,layer:Int }
-struct ClothingItem:Decodable { let id:Int,name:String,faction:Int,kits:Int,slot:Int;let templates:[ClothingRef];let icon:String? }
+struct ClothingItem:Decodable { let id:Int,name:String,faction:Int,kits:Int,slot:Int;let templates:[ClothingRef];let icon:String?;let minimumLevel:Int?,valorPrice:Int?,fundsPrice:Int? }
 struct ClothingTemplate:Decodable { let kind:String,materialType:String;let mesh:String?,texture:String?;let coordinate:[Int],size:[Int] }
 struct WardrobeDefault:Decodable { let appearance:[Int],equipment:[Int] }
 struct WardrobeColor:Decodable { let id:Int,name:String,kind:String;let rgb:[Int] }
-struct WardrobeWeapon:Decodable { let id:Int,name:String,faction:Int,kits:Int,weaponClass:Int;let icon:String?;let model:String;let rpm:Double,magazine:Int,reload:Double;let pose:String?,weaponType:String? }
+struct WardrobeWeapon:Decodable { let id:Int,name:String,faction:Int,kits:Int,weaponClass:Int;let icon:String?;let model:String;let rpm:Double,magazine:Int,reload:Double;let pose:String?,weaponType:String?;let minimumLevel:Int?,valorPrice:Int?,fundsPrice:Int? }
 struct WardrobeCatalog:Decodable { let items:[ClothingItem],templates:[String:ClothingTemplate],defaults:[String:WardrobeDefault],colors:[WardrobeColor],weapons:[WardrobeWeapon] }
 struct HeroLoadout:Codable { var clothing:[Int:Int]=[:];var weapons:[Int]=[];var skin=7;var hair=2 }
 extension HeroClass {

@@ -37,6 +37,49 @@ func capsuleHit(origin:V3,direction:V3,feet:V3,radius:Double=0.45)->Double? {
     }
     return hits.min()
 }
+
+// Local career. Original level thresholds are transcribed from the historically documented BFH level table.
+// Shop fallback prices and VP mission payouts are offline adaptations, not historical prices.
+struct HeroCareer:Codable {
+    static let thresholds=[0,600,1800,4000,7600,13100,21200,32700,48600,71400,102700,144000,196800,261900,339800,430400,533300,647500,772100,906100,1055900,1221300,1402200,1598200,1809300,2035500,2276600,2532700,2803900,3090300]
+    var xp=0,valor=0,funds=0,spentHeroPoints=1,abilityRank=1
+    var owned:Set<Int>=[],kills=0,captures=0,matches=0
+    var rewardedMatches:Set<String>=[],claimedMissions:Set<String>=[]
+    var level:Int { min(30,Self.thresholds.filter{$0<=xp}.count) }
+    var heroPoints:Int { max(0,1+level/2-spentHeroPoints) }
+    var levelFraction:Double {
+        guard level<30 else {return 1}
+        let base=Self.thresholds[level-1],next=Self.thresholds[level]
+        return Double(xp-base)/Double(next-base)
+    }
+    mutating func earn(_ amount:Int) {xp=max(0,xp+max(0,amount))}
+    mutating func upgradeAbility()->Bool {
+        guard heroPoints>0,abilityRank<5 else{return false}
+        spentHeroPoints+=1;abilityRank+=1;return true
+    }
+    mutating func purchase(id:Int,minimumLevel:Int,valorPrice:Int?,fundsPrice:Int?)->Bool {
+        guard !owned.contains(id),level>=minimumLevel else{return false}
+        if let price=valorPrice {guard price>=0,valor>=price else{return false};valor-=price}
+        else if let price=fundsPrice {guard price>=0,funds>=price else{return false};funds-=price}
+        else {return false}
+        owned.insert(id);return true
+    }
+    @discardableResult mutating func finishMatch(id:String,kills:Int,captures:Int,won:Bool)->Int {
+        guard rewardedMatches.insert(id).inserted else{return 0}
+        self.kills+=max(0,kills);self.captures+=max(0,captures);matches+=1
+        var reward=20+max(0,kills)*3+max(0,captures)*10+(won ? 15 : 0)
+        for (key,done,bonus) in [("first-match",matches>=1,100),("infantry-10",self.kills>=10,150),("flags-3",self.captures>=3,200)] where done && !claimedMissions.contains(key) {
+            claimedMissions.insert(key);reward+=bonus
+        }
+        valor+=reward
+        return reward
+    }
+}
+struct CombatFeedback {
+    var attacker:Int,victim:Int,position:V2,height:Double,damage:Int,killed:Bool
+}
+struct ScoreFeedback {var hero:Int,amount:Int,reason:String}
+
 enum Mode: String, CaseIterable { case conquest = "Conquest", flags = "Capture the Flag", elimination = "Elimination", rocket = "Rocket Control" }
 enum HeroClass: String, CaseIterable {
     case soldier = "Soldier", heavy = "Gunner", scout = "Commando"
@@ -82,6 +125,7 @@ final class Hero {
     var weaponDamage:Double { weapon?.damage ?? kind.damage }
     var weaponRange:Double { weapon?.range ?? kind.range }
     func equip(_ weapons:[WeaponProfile]) { equipped=weapons;ammunition=weapons.map{$0.magazine};weaponSlot=0;reloadRemaining=0 }
+    var matchXP=0,captures=0,abilityRank=1
     var recentShot=0.0
     var cooldown: Double = 0; var ability: Double = 0
     var raidWaypoint:V2?=nil,raidComplete=false,raidReadyAt:Double?=nil
@@ -118,6 +162,8 @@ final class Game {
         Block(center:V2(x:-10,z:9),half:V2(x:2,z:4)), Block(center:V2(x:10,z:-9),half:V2(x:2,z:4)),
         Block(center:V2(x:0,z:-10),half:V2(x:3,z:2)), Block(center:V2(x:0,z:10),half:V2(x:3,z:2)),
         Block(center:V2(x:-5,z:0),half:V2(x:1,z:2)), Block(center:V2(x:5,z:0),half:V2(x:1,z:2))]
+    let matchID=UUID().uuidString
+    var feedback:[CombatFeedback]=[],scoreFeedback:[ScoreFeedback]=[]
     var flagPickups=[0,0]
     var score = [0.0,0.0]; var tickets = [70.0,70.0]
     var elapsed = 0.0; var winner: Int?; var shots: [Shot] = []; var message = ""
@@ -315,13 +361,22 @@ final class Game {
     }
     func hurt(_ h: Hero, _ amount: Double, attacker: Hero) {
         guard h.alive, h.invulnerable <= 0 else { return }
-        h.hp -= amount; h.lastAttacker=attacker.id
+        let actual=max(0,min(h.hp,amount))
+        guard actual>0 else{return}
+        h.hp -= actual; h.lastAttacker=attacker.id
+        let points=Int(actual.rounded())
+        attacker.matchXP+=points
+        feedback.append(CombatFeedback(attacker:attacker.id,victim:h.id,position:h.p,height:groundHeight(h.p)+h.elevation+1.9,damage:points,killed:h.hp<=0))
         if h.hp <= 0 {
             h.hp=0; h.deaths+=1; attacker.kills+=1; h.respawn=4
+            award(attacker,50,reason:"ENEMY ELIMINATED")
             for t in 0..<2 where flags[t].carrier == h.id { flags[t].carrier=nil; flags[t].p=h.p; flags[t].droppedAt=elapsed }
             if mode == .conquest { tickets[h.team] -= 1 }
             message=attacker.id == 0 ? "Eliminated enemy" : h.id == 0 ? "Respawning…" : ""
         }
+    }
+    func award(_ h:Hero,_ points:Int,reason:String) {
+        h.matchXP+=max(0,points);scoreFeedback.append(ScoreFeedback(hero:h.id,amount:points,reason:reason))
     }
     func reload(_ h:Hero) {
         guard h.alive,h.reloadRemaining<=0,let weapon=h.weapon,h.ammunition[h.weaponSlot]<weapon.magazine else { return }
@@ -399,14 +454,14 @@ final class Game {
     }
     func ability(_ h: Hero) {
         guard h.ability <= 0, h.alive else { return }
-        h.ability=12
+        h.ability=max(6,12-Double(h.abilityRank-1))
         switch h.kind {
         case .soldier:
-            for friend in heroes where friend.team == h.team && friend.alive && friend.p.distance(h.p)<7 { friend.hp=min(friend.kind.hp,friend.hp+45) }
+            for friend in heroes where friend.team == h.team && friend.alive && friend.p.distance(h.p)<7 { friend.hp=min(friend.kind.hp,friend.hp+45+Double(h.abilityRank-1)*8) }
             if h.id == 0 { message="Field heal" }
-        case .heavy: h.invulnerable=3; if h.id == 0 { message="Shield up" }
+        case .heavy: h.invulnerable=3+Double(h.abilityRank-1)*0.3; if h.id == 0 { message="Shield up" }
         case .scout:
-            for _ in 0..<15 { move(h,V2(x:sin(h.facing),z:cos(h.facing)),0.055) }
+            for _ in 0..<(15+h.abilityRank-1) { move(h,V2(x:sin(h.facing),z:cos(h.facing)),0.055) }
             h.invulnerable=0.6; if h.id == 0 { message="Dash" }
         }
     }
@@ -484,12 +539,16 @@ final class Game {
         switch mode {
         case .conquest, .rocket:
             for i in objectives.indices {
+                let previousOwner=objectives[i].owner
                 let near=heroes.filter { $0.alive && $0.p.distance(objectives[i].p)<3.8 }
                 let blue=near.filter { $0.team == 0 }.count, red=near.count-blue
                 if blue != red {
                     let direction=blue>red ? -1.0 : 1.0
                     objectives[i].progress=max(-1,min(1,objectives[i].progress+direction*dt*0.22*Double(min(3,abs(blue-red)))))
                     objectives[i].owner=objectives[i].progress<=(-1) ? 0 : objectives[i].progress>=1 ? 1 : -1
+                }
+                if objectives[i].owner>=0 && previousOwner != objectives[i].owner {
+                    for h in near where h.team==objectives[i].owner {h.captures+=1;award(h,150,reason:"FLAG CAPTURED")}
                 }
             }
             if mode == .conquest {
@@ -513,7 +572,7 @@ final class Game {
             }
             for t in 0..<2 {
                 if let id=flags[1-t].carrier, heroes[id].p.distance(flags[t].home)<2.5, flags[t].carrier == nil, flags[t].p.distance(flags[t].home)<1 {
-                    score[t]+=1; flags[1-t].carrier=nil; flags[1-t].p=flags[1-t].home; message=t == 0 ? "Blue captured!" : "Red captured!"
+                    score[t]+=1;heroes[id].captures+=1;award(heroes[id],150,reason:"FLAG CAPTURED"); flags[1-t].carrier=nil; flags[1-t].p=flags[1-t].home; message=t == 0 ? "Blue captured!" : "Red captured!"
                     if score[t]>=3 { winner=t }
                 }
             }
