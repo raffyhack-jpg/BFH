@@ -50,7 +50,7 @@ final class AnimatedCharacter {
             for i in stride(from:0,to:part.uv.count,by:2) { uv.append(CGPoint(x:CGFloat(part.uv[i]),y:CGFloat(part.uv[i+1]))) }
             let element=SCNGeometryElement(data:Self.data(part.faces),primitiveType:.triangles,primitiveCount:part.faces.count/3,bytesPerIndex:4)
             let geometry=SCNGeometry(sources:[SCNGeometrySource(vertices:positions),SCNGeometrySource(normals:normals),SCNGeometrySource(textureCoordinates:uv)],elements:[element])
-            let material=SCNMaterial(); material.diffuse.contents=(textures[part.materialType ?? ""] as Any?) ?? directory.appendingPathComponent("\(faction)_t0.png"); material.roughness.contents=0.95;material.lightingModel = .lambert;material.isDoubleSided=true; geometry.materials=[material]
+            let material=SCNMaterial(); material.diffuse.contents=(textures[part.materialType ?? ""] as Any?) ?? directory.appendingPathComponent("\(faction)_t0.png"); if textures[part.materialType ?? ""] != nil { var transform=SCNMatrix4MakeScale(1,-1,1);transform.m42=1;material.diffuse.contentsTransform=transform };material.roughness.contents=0.95;material.lightingModel = .lambert;material.isDoubleSided=true; geometry.materials=[material]
             let weights=SCNGeometrySource(data:Self.data(part.weights),semantic:.boneWeights,vectorCount:positions.count,usesFloatComponents:true,componentsPerVector:2,bytesPerComponent:4,dataOffset:0,dataStride:8)
             let indices=SCNGeometrySource(data:Self.data(part.indices),semantic:.boneIndices,vectorCount:positions.count,usesFloatComponents:false,componentsPerVector:2,bytesPerComponent:2,dataOffset:0,dataStride:4)
             let inverse=part.inverseBind.map { NSValue(scnMatrix4:Self.matrix($0)) }
