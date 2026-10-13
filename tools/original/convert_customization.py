@@ -103,6 +103,11 @@ def main():
     (out/'catalog.json').write_text(json.dumps(catalog,separators=(',',':')))
     (out/'provenance.json').write_text(json.dumps({'client':'Battlefield Heroes 1.105','sources':sources,'unresolved':unresolved},indent=2))
     soldiers=Archive(base/'Objects/Soldiers_server.zip')
+    print('ORIGINAL WEAPON POSE CLIPS',[n for n in soldiers.entries if n.startswith('british_male_soldier/animations/') and n.endswith('.baf') and any(t in n for t in ['idle','runforward','fire'])][:110])
+    for name in soldiers.entries:
+        if name.startswith('british_male_soldier/animations/') and name.endswith('animationsystem3p.inc') and '/smg/' not in name:
+            print('ORIGINAL WEAPON ANIMATION SYSTEM',name,soldiers.read(name).decode('latin1')[:2200])
+
     for faction,prefix in [('royal','british_male_soldier'),('national','german_male_soldier')]:
         path=Path('Assets/Characters')/(faction+'-rig.json');rig=json.loads(path.read_text())
         for key,filename in [('jumpStart','stilljumpstart.baf'),('jumpLoop','stilljumploop.baf'),('jumpEnd','stilljumpend.baf')]:

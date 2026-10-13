@@ -158,7 +158,7 @@ final class GameController: UIViewController {
         g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false,jump:jumpRequested));jumpRequested=false
         for (i,h) in g.heroes.enumerated() {
             nodes[i].position=SCNVector3(Float(h.p.x),(originalWorld?.height(h.p) ?? 0)+Float(h.elevation),Float(h.p.z)); nodes[i].eulerAngles.y=Float(h.facing); if let animator=animators[i] {
-                animator.update(dt,position:h.p,moving:h.p.distance(previousPositions[i])>0.003,firing:h.cooldown>h.weaponInterval-0.08,ability:h.ability>11.5,alive:h.alive,jumping:h.elevation>0.01)
+                animator.update(dt,position:h.p,moving:h.p.distance(previousPositions[i])>0.003,firing:h.recentShot>0,ability:h.ability>11.5,alive:h.alive,jumping:h.elevation>0.01)
 
             } else { nodes[i].isHidden = !h.alive }
             previousPositions[i]=h.p

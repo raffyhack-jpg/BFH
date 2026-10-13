@@ -54,6 +54,7 @@ final class Hero {
     var weaponDamage:Double { weapon?.damage ?? kind.damage }
     var weaponRange:Double { weapon?.range ?? kind.range }
     func equip(_ weapons:[WeaponProfile]) { equipped=weapons;ammunition=weapons.map{$0.magazine};weaponSlot=0;reloadRemaining=0 }
+    var recentShot=0.0
     var cooldown: Double = 0; var ability: Double = 0
     var think: Double = 0; var path: [V2] = []; var target: V2 = .zero
     var kills = 0; var deaths = 0; var lastAttacker: Int?
@@ -266,7 +267,7 @@ final class Game {
             if h.ammunition[h.weaponSlot]<=0 { reload(h);return }
             h.ammunition[h.weaponSlot]-=1
         }
-        h.cooldown=h.weaponInterval
+        h.cooldown=h.weaponInterval;h.recentShot=0.12
         let direction=aim.unit
         let target=heroes.filter {
             guard $0.team != h.team && $0.alive else { return false }
@@ -311,6 +312,7 @@ final class Game {
                 h.reloadRemaining=max(0,h.reloadRemaining-dt)
                 if h.reloadRemaining==0,let weapon=h.weapon { h.ammunition[h.weaponSlot]=weapon.magazine }
             }
+            h.recentShot=max(0,h.recentShot-dt)
             h.cooldown=max(0,h.cooldown-dt); h.ability=max(0,h.ability-dt); h.invulnerable=max(0,h.invulnerable-dt)
             if !h.alive {
                 h.respawn-=dt

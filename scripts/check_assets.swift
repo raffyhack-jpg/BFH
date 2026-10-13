@@ -118,7 +118,7 @@ for (_,template) in wardrobe.catalog.templates {if let file=template.mesh {
         let count=part.positions.count/3
         precondition(count>0 && part.weights.count==count*2 && part.indices.count==count*2,"Clothing weights missing")
         precondition(part.boneIDs.allSatisfy{$0>=0 && $0<74} && part.indices.allSatisfy{Int($0)<part.boneIDs.count},"Clothing references an invalid bone")
-        precondition(part.faces.allSatisfy{$0>=0 && $0<count},"Clothing topology invalid")
+        precondition(part.faces.allSatisfy{$0>=0 && Int($0)<count},"Clothing topology invalid")
     }
 }}
 print("Validated wardrobe: \(wardrobe.catalog.items.count) original items, \(wardrobe.catalog.weapons.count) original weapons")
@@ -129,7 +129,7 @@ if let device=MTLCreateSystemDefaultDevice() {
     for faction in 1...2 {
         let actor=try AnimatedCharacter(faction==1 ? "royal" : "national",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
         try wardrobe.apply(wardrobe.defaults(faction,.soldier),faction:faction,to:actor)
-        actor.node.position.x=faction==1 ? -1.2 : 1.2;actor.node.simdEulerAngles.y=Float.pi
+        actor.node.position.x=faction==1 ? -1.2 : 1.2;actor.node.simdEulerAngles.y=0
         for _ in 0..<10 {actor.update(1.0/30,position:.zero,moving:false,firing:false,ability:false,alive:true)}
         scene.rootNode.addChildNode(actor.node)
     }
