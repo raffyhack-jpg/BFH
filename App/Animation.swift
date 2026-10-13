@@ -178,12 +178,22 @@ final class OriginalWardrobe {
         var materials:[String:CGImage]=[:]
         for type in Set(meshes.keys).union(layers.keys) {
             let stack=layers[type] ?? []
-            let minimum=type=="cit_body" || type=="cit_hands" ? [1024,512] : type=="cit_feet" ? [256,128] : [512,512]
+            let canvases:[String:[Int]]=[
+                "cit_head":[464,304],"cit_headhair":[464,304],"cit_body":[1024,512],"cit_hands":[1024,512],
+                "cit_legs":[384,304],"cit_feet":[192,128],"cit_hat":[320,224],"cit_hair":[320,224],
+                "cit_facehair":[192,96],"cit_faceobj":[192,96],"cit_neck":[96,224],
+                "cit_chestitem":[160,224],"cit_waistback":[160,224],"cit_waistitem":[160,224],
+                "cit_waistleft":[160,224],"cit_waistright":[160,224]
+            ]
+            let minimum=canvases[type] ?? [8,8]
+            func rounded(_ value:Int)->Int { max(8,((value+7)/8)*8) }
             func power(_ value:Int)->Int { var p=1;while p<value {p*=2};return p }
-            let width=canvasOverrides[type]?[0] ?? power(max(minimum[0],stack.map{$0.coordinate[0]+$0.size[0]}.max() ?? 0)),height=canvasOverrides[type]?[1] ?? power(max(minimum[1],stack.map{$0.coordinate[1]+$0.size[1]}.max() ?? 0))
+            let requiredWidth=stack.map{$0.coordinate[0]+$0.size[0]}.max() ?? 0,requiredHeight=stack.map{$0.coordinate[1]+$0.size[1]}.max() ?? 0
+            let width=canvasOverrides[type]?[0] ?? (type=="cit_body" ? power(max(minimum[0],requiredWidth)) : max(minimum[0],rounded(requiredWidth)))
+            let height=canvasOverrides[type]?[1] ?? (type=="cit_body" ? power(max(minimum[1],requiredHeight)) : max(minimum[1],rounded(requiredHeight)))
             guard let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:width*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
             let tone=catalog.colors.first{$0.kind==(type.contains("hair") ? "hair" : "skin") && $0.id==(type.contains("hair") ? loadout.hair : loadout.skin)}?.rgb ?? [153,119,86]
-            context.setFillColor(CGColor(red:CGFloat(tone[0])/255,green:CGFloat(tone[1])/255,blue:CGFloat(tone[2])/255,alpha:1));context.fill(CGRect(x:0,y:0,width:width,height:height))
+            if ["cit_head","cit_headhair","cit_body","cit_hands","cit_legs","cit_feet"].contains(type) { context.setFillColor(CGColor(red:CGFloat(tone[0])/255,green:CGFloat(tone[1])/255,blue:CGFloat(tone[2])/255,alpha:1));context.fill(CGRect(x:0,y:0,width:width,height:height)) }
             for layer in stack { if let file=layer.texture,let original=image(file) {
                 let skinBase=file==catalog.templates[prefix+"head001_head001"]?.texture || file==catalog.templates[prefix+"body001_body001"]?.texture
                 let im=skinBase || type.contains("hair") ? tinted(original,tone:tone) : original

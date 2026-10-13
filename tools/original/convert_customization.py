@@ -12,13 +12,10 @@ def main():
     base=Path(sys.argv[1]);out=Path(sys.argv[2]);out.mkdir(parents=True,exist_ok=True)
     for folder in ['meshes','textures','icons']: (out/folder).mkdir(exist_ok=True)
     server=Archive(base/'Objects/Items_server.zip');client=Archive(base/'Objects/Items_client.zip');menu=Archive(base/'Menu_client.zip')
-    print('ORIGINAL VECTORS CONFIG',server.read('vectors.xml').decode('utf8',errors='replace')[:7000])
     templates={};sources=[];mesh_paths={Path(n).stem:n for n in client.entries if n.endswith('.skinnedmesh')}
     def record(archive,name,data): sources.append({'archive':str(archive.path.relative_to(base)),'entry':name,'sha256':hashlib.sha256(data).hexdigest()})
     def png(archive,name,folder):
         raw=archive.read(name);record(archive,name,raw);im=Image.open(io.BytesIO(raw)).convert('RGBA');file=folder+'/'+hashlib.sha256(raw).hexdigest()[:20]+'.png'
-        if name.lower().endswith('head001_head001.tga'):
-            rgba=np.array(im);print('ORIGINAL HEAD PIXEL DATA',name,im.size,'alpha',np.unique(rgba[:,:,3],return_counts=True),'top colors', sorted([(int(count),list(color)) for color,count in zip(*np.unique(rgba.reshape(-1,4),axis=0,return_counts=True))],reverse=True)[:10])
         if not (out/file).exists(): im.save(out/file,compress_level=6)
         return file,list(im.size)
     def value(text,key):
@@ -28,10 +25,6 @@ def main():
         candidates=[g.lods[0] for g in model.geoms if g.lods and any(r.bones for r in g.lods[0].rigs)]
         if not candidates:raise ValueError('No weighted render geometry: '+name)
         lod=max(candidates,key=lambda l:sum(len(m.vertices) for m,r in zip(l.materials,l.rigs) if r.bones));parts=[]
-        if name in ['bri_m_head001','bri_m_body002','bri_m_legs002','bri_m_feet002']:
-            for mat in lod.materials:
-                uv=np.array([v.texcoord0 for v in mat.vertices])
-                if len(uv):print('ORIGINAL DEFAULT UV EXTENTS',name,uv.min(0).tolist(),uv.max(0).tolist(),'vertex colors',set(v.color for v in mat.vertices))
         for mat,rig in zip(lod.materials,lod.rigs):
             if not mat.vertices or not mat.faces or not rig.bones:continue
             part={'positions':[],'normals':[],'uv':[],'weights':[],'indices':[],'faces':[],'boneIDs':[b.id for b in rig.bones],'inverseBind':[],'materialType':kind}
@@ -60,7 +53,7 @@ def main():
         if bits[0].lower()=='soldiermeshitem' and key in mesh_paths:
             try:converted=mesh(key,kind)
             except ValueError as error:
-                print('UNSUPPORTED CLOTHING GEOMETRY',key,str(error),text);continue
+                print('Unusable original clothing geometry',key,str(error));continue
             templates[key]={'kind':'mesh','materialType':kind,'mesh':converted,'texture':None,'coordinate':[0,0],'size':[0,0]}
         elif bits[0].lower()=='soldiertextureitem':
             file=value(text,'geometryTemplate.fileName');coord=value(text,'geometryTemplate.setCoordinate') or '0/0'
@@ -72,7 +65,7 @@ def main():
     localization={};local=base/'Localization/strings.csv'
     if local.exists():
         data=local.read_bytes();text=data.decode('utf16' if data[:2] in [b'\xff\xfe',b'\xfe\xff'] else 'utf-8-sig',errors='replace');rows=list(csv.reader(io.StringIO(text),delimiter='\t'))
-        print('LOCALIZATION CSV HEADER',rows[:2])
+        print('Loaded original localization rows:',len(rows))
         english=next((i for i,h in enumerate(rows[0]) if h.lower() in ['english','en','en_us','en-us','eng_us']),1)
         for row in rows[1:]:
             if len(row)>english:localization[row[0].strip().lower()]=row[english].strip()
@@ -116,11 +109,6 @@ def main():
     catalog={'items':items,'templates':templates,'defaults':defaults,'colors':colors,'weapons':weapons}
     (out/'catalog.json').write_text(json.dumps(catalog,separators=(',',':')))
     soldiers=Archive(base/'Objects/Soldiers_server.zip')
-    print('ORIGINAL WEAPON POSE CLIPS',[n for n in soldiers.entries if n.startswith('british_male_soldier/animations/') and n.endswith('.baf') and any(t in n for t in ['idle','runforward','fire'])][:110])
-    for name in soldiers.entries:
-        if name.startswith('british_male_soldier/animations/') and name.endswith('animationsystem3p.inc') and '/smg/' not in name:
-            print('ORIGINAL WEAPON ANIMATION SYSTEM',name,soldiers.read(name).decode('latin1')[:2200])
-
     def clip(source):
         raw=soldiers.read(source);record(soldiers,source,raw);temp=out/'temp.baf';temp.write_bytes(raw);anim=BF2Animation(str(temp));temp.unlink()
         tracks={str(bone):[[f.pos.x,f.pos.y,-f.pos.z,-f.rot.x,-f.rot.y,f.rot.z,f.rot.w] for f in frames] for bone,frames in anim.bones.items()}
