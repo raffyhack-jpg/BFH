@@ -1,6 +1,7 @@
 import Foundation
 import SceneKit
 import CoreGraphics
+import simd
 
 struct OriginalPart:Decodable { let vertexOffset:Int,vertexCount:Int,indexOffset:Int,indexCount:Int; let texture:String?; let alpha:Bool }
 struct OriginalMesh:Decodable { let file:String; let parts:[OriginalPart]; let min:[Float],max:[Float] }
@@ -9,11 +10,13 @@ struct OriginalBlock:Decodable { let center:[Double],half:[Double];let angle:Dou
 struct OriginalMap:Decodable {
     let name:String,meshAssets:[String:OriginalMesh],instances:[OriginalInstance],weapons:[String:String]
     let blocks:[OriginalBlock],bases:[[Double]],objectives:[[Double]],flags:[String:String],sky:String
+    let wallTriangles:[[Float]]?,walkTriangles:[[Float]]?
     let size:Int,spacing:Double,origin:Double,waterHeight:Double,heightFile:String
 }
 final class OriginalWorld {
     let directory:URL; let map:OriginalMap; let heights:[Float]
     var cache:[String:SCNNode]=[:]
+    var wallCells:[Int:[[Float]]]=[:],deckCells:[Int:[[Float]]]=[:]
     init(directory:URL) throws {
         self.directory=directory
         map=try JSONDecoder().decode(OriginalMap.self,from:Data(contentsOf:directory.appendingPathComponent("world.json")))
@@ -23,14 +26,57 @@ final class OriginalWorld {
             let bits=raw.subdata(in:offset..<offset+4).withUnsafeBytes{$0.loadUnaligned(as:UInt32.self)}
             return Float(bitPattern:UInt32(littleEndian:bits))
         }
+        func index(_ triangles:[[Float]],into cells:inout [Int:[[Float]]]) {
+            for t in triangles where t.count==9 {
+                let xs=[t[0],t[3],t[6]],zs=[t[2],t[5],t[8]]
+                for x in Int(floor((xs.min()!-0.5)/8))...Int(floor((xs.max()!+0.5)/8)) {
+                    for z in Int(floor((zs.min()!-0.5)/8))...Int(floor((zs.max()!+0.5)/8)) { cells[x*10000+z,default:[]].append(t) }
+                }
+            }
+        }
+        index(map.wallTriangles ?? [],into:&wallCells);index(map.walkTriangles ?? [],into:&deckCells)
     }
-    func height(_ p:V2) -> Float {
+    func terrainHeight(_ p:V2) -> Float {
         let x=max(0,min(Double(map.size-1)-0.001,(p.x-map.origin)/map.spacing))
         let z=max(0,min(Double(map.size-1)-0.001,(p.z-map.origin)/map.spacing))
         let ix=Int(x),iz=Int(z),fx=Float(x-Double(ix)),fz=Float(z-Double(iz))
         let a=heights[iz*map.size+ix]*(1-fx)+heights[iz*map.size+ix+1]*fx
         let b=heights[(iz+1)*map.size+ix]*(1-fx)+heights[(iz+1)*map.size+ix+1]*fx
         return a*(1-fz)+b*fz
+    }
+    func height(_ p:V2)->Float {
+        var result=terrainHeight(p)
+        for t in deckCells[Int(floor(p.x/8))*10000+Int(floor(p.z/8))] ?? [] {
+            let x=Float(p.x),z=Float(p.z)
+            let denominator=(t[5]-t[8])*(t[0]-t[6])+(t[6]-t[3])*(t[2]-t[8])
+            if abs(denominator)<0.00001 { continue }
+            let a=((t[5]-t[8])*(x-t[6])+(t[6]-t[3])*(z-t[8]))/denominator
+            let b=((t[8]-t[2])*(x-t[6])+(t[0]-t[6])*(z-t[8]))/denominator
+            if a>=0 && b>=0 && a+b<=1 { result=max(result,a*t[1]+b*t[4]+(1-a-b)*t[7]) }
+        }
+        return result
+    }
+    func clearWalls(_ p:V2)->Bool {
+        let triangles=wallCells[Int(floor(p.x/8))*10000+Int(floor(p.z/8))] ?? []
+        let feet=height(p)
+        for t in triangles {
+            for offset:Float in [0.3,1.0,1.65] {
+                let level=feet+offset
+                if level<min(t[1],t[4],t[7]) || level>max(t[1],t[4],t[7]) { continue }
+                var points:[SIMD2<Float>]=[]
+                for (i,j) in [(0,3),(3,6),(6,0)] {
+                    let dy=t[j+1]-t[i+1]
+                    if abs(dy)<0.00001 { continue }
+                    let f=(level-t[i+1])/dy
+                    if f>=0 && f<=1 { points.append(SIMD2(t[i]+(t[j]-t[i])*f,t[i+2]+(t[j+2]-t[i+2])*f)) }
+                }
+                if points.count<2 { continue }
+                let a=points[0],b=points[1],d=b-a,v=SIMD2(Float(p.x),Float(p.z))-a
+                let fraction=max(0,min(1,simd_dot(v,d)/max(0.00001,simd_dot(d,d))))
+                if simd_length(v-d*fraction)<0.42 { return false }
+            }
+        }
+        return true
     }
     func model(_ name:String) throws -> SCNNode {
         if let node=cache[name] { return node.clone() }
@@ -81,8 +127,8 @@ final class OriginalWorld {
         return try model(name)
     }
     var layout:MapLayout {
-        MapLayout(bases:map.bases.map{V2(x:$0[0],z:$0[1])},objectives:map.objectives.map{V2(x:$0[0],z:$0[1])},blocks:map.blocks.map{Block(center:V2(x:$0.center[0],z:$0.center[1]),half:V2(x:$0.half[0],z:$0.half[1]),angle:$0.angle ?? 0)},extent:240,gridStep:1.5,walkable:{ [self] p in
-            height(p)>Float(map.waterHeight)+0.4 && abs(height(p+V2(x:1,z:0))-height(p-V2(x:1,z:0)))<1.8 && abs(height(p+V2(x:0,z:1))-height(p-V2(x:0,z:1)))<1.8
+        MapLayout(bases:map.bases.map{V2(x:$0[0],z:$0[1])},objectives:map.objectives.map{V2(x:$0[0],z:$0[1])},blocks:[],extent:240,gridStep:1.5,walkable:{ [self] p in
+            clearWalls(p) && height(p)>Float(map.waterHeight)+0.4 && abs(height(p+V2(x:1,z:0))-height(p-V2(x:1,z:0)))<1.8 && abs(height(p+V2(x:0,z:1))-height(p-V2(x:0,z:1)))<1.8
         })
     }
 }

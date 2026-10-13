@@ -73,7 +73,7 @@ def main():
         temp=out/('temp'+Path(name).suffix);temp.write_bytes(data)
         model=BF2Mesh.load(str(temp)); temp.unlink()
         lod=model.geoms[min(geom,len(model.geoms)-1)].lods[0]
-        blob=bytearray(); parts=[]; allpos=[]
+        blob=bytearray(); parts=[]; allpos=[]; wallfaces=[]; decks=[]
         for mat in lod.materials:
             if not mat.faces or not mat.vertices: continue
             tex=texture(archive,mat.maps[0]) if mat.maps else None
@@ -82,6 +82,15 @@ def main():
                 p=v.position; n=v.normal or (0,1,0); uv=v.texcoord0 or (0,0)
                 packed.extend([p[0],p[1],-p[2],n[0],n[1],-n[2],uv[0],1-uv[1]])
                 allpos.append([p[0],p[1],-p[2]])
+            pts=np.array(packed).reshape(-1,8)[:,:3]
+            faces=pts[np.array(mat.faces,dtype=int)]
+            normals=np.cross(faces[:,1]-faces[:,0],faces[:,2]-faces[:,0])
+            lengths=np.linalg.norm(normals,axis=1)
+            vertical=(np.abs(normals[:,1])<lengths*.55)&(np.ptp(faces[:,:,1],axis=1)>.35)
+            wallfaces.extend(faces[vertical].round(5).reshape(-1,9).tolist())
+            if any(token in identifier for token in ['bridge','stairs','quay','ramp']):
+                horizontal=np.abs(normals[:,1])>lengths*.65
+                decks.extend(faces[horizontal].round(5).reshape(-1,9).tolist())
             vo=len(blob); blob.extend(struct.pack('<'+'f'*len(packed),*packed))
             indices=[i for f in mat.faces for i in [f[0],f[2],f[1]]]
             io_=len(blob); blob.extend(struct.pack('<'+'I'*len(indices),*indices))
@@ -89,7 +98,7 @@ def main():
         if not parts: raise ValueError('Empty original model '+name)
         file='meshes/'+identifier+'.bin'; (out/file).write_bytes(blob)
         points=np.array(allpos); lower=points[points[:,1]<points[:,1].min()+2]
-        meshes[identifier]={'file':file,'parts':parts,'min':points.min(axis=0).tolist(),'max':points.max(axis=0).tolist(),'footMin':lower.min(axis=0).tolist(),'footMax':lower.max(axis=0).tolist()}
+        meshes[identifier]={'file':file,'parts':parts,'min':points.min(axis=0).tolist(),'max':points.max(axis=0).tolist(),'footMin':lower.min(axis=0).tolist(),'footMax':lower.max(axis=0).tolist(),'walls':wallfaces,'decks':decks}
         return identifier
     geometry={}
     for name in server.entries:
@@ -97,7 +106,7 @@ def main():
             text=server.read(name).decode('latin1')
             match=re.search(r'ObjectTemplate\.geometry\s+(\S+)',text,re.I)
             if match: geometry[Path(name).stem]=match[1].lower()
-    instances=[]; collision=[]
+    instances=[]; collision=[]; worldwalls=[]; worlddecks=[]
     for item in placements(level.read('StaticObjects.con').decode('latin1')):
         name=geometry.get(item['name'],item['name'])
         found=None
@@ -111,6 +120,14 @@ def main():
         except (KeyError,ValueError) as e: failures.append(str(e));continue
         p=item['position']; r=item['rotation']; yaw=-math.radians(r[0])
         instances.append({'mesh':name,'position':[p[0],p[1],-p[2]],'rotation':[math.radians(r[1]),yaw,-math.radians(r[2])]})
+        c,s=math.cos(yaw),math.sin(yaw)
+        for key,destination in [('walls',worldwalls),('decks',worlddecks)]:
+            for triangle in meshes[name][key]:
+                points=np.array(triangle).reshape(3,3);result=points.copy()
+                result[:,0]=points[:,0]*c+points[:,2]*s+p[0]
+                result[:,2]=-points[:,0]*s+points[:,2]*c-p[2]
+                result[:,1]=points[:,1]+p[1]
+                destination.append(result.round(5).reshape(-1).tolist())
         # Rotated footprint for path finding; decorative elevated lights are not walls.
         bounds=meshes[name]; mn=np.array(bounds['min']); mx=np.array(bounds['max'])
         if name.startswith('mt_'): mn=np.array(bounds['footMin']);mx=np.array(bounds['footMax'])
@@ -160,7 +177,7 @@ def main():
     gameplay=level.read('GameModes/gpm_tdm/16/GamePlayObjects.con');record(level,'GameModes/gpm_tdm/16/GamePlayObjects.con',gameplay)
     controlpoints={p['name']:p['position'] for p in placements(gameplay.decode('latin1'))}
     objectives=[[controlpoints[n][0],-controlpoints[n][2]] for n in ['market','boulevard','toll_house','square']]
-    world={'name':'Original BFH heat map','meshAssets':meshes,'instances':instances,'weapons':weapons,'flags':flags,'sky':sky,'blocks':collision,'bases':[[78.722,105.957],[-72.195,-73.048]],'objectives':objectives,'size':257,'spacing':2,'origin':-256,'waterHeight':19,'heightFile':'height.bin'}
+    world={'name':'Original BFH heat map','meshAssets':meshes,'instances':instances,'weapons':weapons,'flags':flags,'sky':sky,'blocks':collision,'wallTriangles':worldwalls,'walkTriangles':worlddecks,'bases':[[78.722,105.957],[-72.195,-73.048]],'objectives':objectives,'size':257,'spacing':2,'origin':-256,'waterHeight':19,'heightFile':'height.bin'}
     (out/'world.json').write_text(json.dumps(world,separators=(',',':')))
     (out/'provenance.json').write_text(json.dumps({'source':'https://archive.org/details/battlefield-heroes-setup','archiveSHA1':'7b77439053f6e79ebf5a9020b22aff85e49195e6','clientVersion':'1.105','reader':'https://github.com/marekzajac97/bf2-blender','convertedSources':sources,'unresolvedObjects':sorted(set(failures))},indent=2))
     print(f'Converted {len(instances)} original placements, {len(meshes)} meshes, {len(textures)} textures and {len(weapons)} weapons; unresolved: {sorted(set(failures))}')
