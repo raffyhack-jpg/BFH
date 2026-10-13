@@ -88,6 +88,7 @@ final class GameController: UIViewController {
         if let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/OriginalWorld") { originalWorld=try? OriginalWorld(directory:directory) }
         if let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Wardrobe") { wardrobe=try? OriginalWardrobe(directory:directory) }
         selectedTeam=min(1,max(0,UserDefaults.standard.integer(forKey:"selected-faction")))
+        if let saved=UserDefaults.standard.string(forKey:"selected-class"),let kind=HeroClass(rawValue:saved) { selectedClass=kind }
         hud.numberOfLines=2;hud.font=UIFont.monospacedSystemFont(ofSize:12,weight:.bold)
         showMenu()
     }
@@ -107,6 +108,7 @@ final class GameController: UIViewController {
         guard let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Characters"),let original=originalWorld else { throw CocoaError(.fileReadNoSuchFile) }
         let animator=try AnimatedCharacter(team == 0 ? "royal" : "national",directory:directory)
         if let wardrobe=wardrobe { try wardrobe.apply(loadout ?? wardrobe.defaults(team+1,kind),faction:team+1,to:animator) }
+        animator.weaponPose=loadout?.weapons.first.flatMap{wardrobe?.weapons[$0]?.pose} ?? "smg"
         animators.append(animator)
         let root=animator.node
         let marker=sphere(0.1,team == 0 ? blue : red); marker.position.y=2.3; root.addChildNode(marker)
@@ -158,7 +160,7 @@ final class GameController: UIViewController {
         g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false,jump:jumpRequested));jumpRequested=false
         for (i,h) in g.heroes.enumerated() {
             nodes[i].position=SCNVector3(Float(h.p.x),(originalWorld?.height(h.p) ?? 0)+Float(h.elevation),Float(h.p.z)); nodes[i].eulerAngles.y=Float(h.facing); if let animator=animators[i] {
-                animator.update(dt,position:h.p,moving:h.p.distance(previousPositions[i])>0.003,firing:h.recentShot>0,ability:h.ability>11.5,alive:h.alive,jumping:h.elevation>0.01)
+                animator.update(dt,position:h.p,moving:h.p.distance(previousPositions[i])>0.003,firing:h.recentShot>0,ability:h.ability>11.5,alive:h.alive,jumping:h.elevation>0.01,reloading:h.reloadRemaining>0)
 
             } else { nodes[i].isHidden = !h.alive }
             previousPositions[i]=h.p
@@ -224,7 +226,7 @@ final class GameController: UIViewController {
         let modes=UISegmentedControl(items:Mode.allCases.map{$0.rawValue}); modes.selectedSegmentIndex=Mode.allCases.firstIndex(of:selectedMode) ?? 0; modes.backgroundColor = .lightGray
         modes.addAction(UIAction { [weak self, weak modes] _ in if let index=modes?.selectedSegmentIndex { self?.selectedMode=Mode.allCases[index] } },for:.valueChanged); stack.addArrangedSubview(modes)
         let classes=UISegmentedControl(items:HeroClass.allCases.map{$0.rawValue}); classes.selectedSegmentIndex=HeroClass.allCases.firstIndex(of:selectedClass) ?? 0; classes.backgroundColor = .lightGray
-        classes.addAction(UIAction { [weak self, weak classes] _ in if let index=classes?.selectedSegmentIndex { self?.selectedClass=HeroClass.allCases[index] } },for:.valueChanged); stack.addArrangedSubview(classes)
+        classes.addAction(UIAction { [weak self, weak classes] _ in if let index=classes?.selectedSegmentIndex { self?.selectedClass=HeroClass.allCases[index];UserDefaults.standard.set(HeroClass.allCases[index].rawValue,forKey:"selected-class") } },for:.valueChanged); stack.addArrangedSubview(classes)
         let customize=UIButton(type:.system);style(customize,"CUSTOMIZE HERO",UIColor(red:0.62,green:0.49,blue:0.17,alpha:1));customize.heightAnchor.constraint(equalToConstant:44).isActive=true
         customize.addAction(UIAction{[weak self] _ in self?.customizeHero()},for:.touchUpInside);stack.addArrangedSubview(customize)
         let startButton=UIButton(type:.system); style(startButton,resume ? "NEW MATCH" : "DEPLOY",blue); startButton.addAction(UIAction { [weak self] _ in self?.start() },for:.touchUpInside); stack.addArrangedSubview(startButton); startButton.heightAnchor.constraint(equalToConstant:48).isActive=true
@@ -242,13 +244,14 @@ extension GameController {
         guard let g=game,!g.paused,g.winner==nil,let actor=animators.first ?? nil,let original=originalWorld else{return}
         g.switchWeapon(g.heroes[0])
         guard let id=g.heroes[0].weapon?.id,let item=wardrobe?.weapons[id],let node=try? original.model(item.model) else{return}
+        actor.weaponPose=item.pose ?? "smg"
         actor.bones[44].childNodes.filter{$0.name=="held-weapon"}.forEach{$0.removeFromParentNode()};node.name="held-weapon";actor.bones[44].addChildNode(node)
     }
     func customizeHero() {
         guard let wardrobe=wardrobe,let original=originalWorld else { notice.text="Wardrobe assets could not be loaded";return }
         let screen=WardrobeController(wardrobe:wardrobe,original:original,faction:selectedTeam+1,kind:selectedClass)
         screen.finished={ [weak self] faction,kind in
-            self?.selectedTeam=faction-1;self?.selectedClass=kind;UserDefaults.standard.set(faction-1,forKey:"selected-faction");self?.showMenu(resume:self?.game?.paused==true && self?.game?.winner==nil)
+            self?.selectedTeam=faction-1;self?.selectedClass=kind;UserDefaults.standard.set(faction-1,forKey:"selected-faction");UserDefaults.standard.set(kind.rawValue,forKey:"selected-class");self?.showMenu(resume:self?.game?.paused==true && self?.game?.winner==nil)
         }
         screen.modalPresentationStyle = .fullScreen;present(screen,animated:true)
     }
@@ -343,7 +346,7 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
         do {
             let a=try AnimatedCharacter(faction==1 ? "royal" : "national",directory:Bundle.main.resourceURL!.appendingPathComponent("Assets/Characters"));try wardrobe.apply(loadout,faction:faction,to:a)
             let slot=category==11 ? slots.selectedSegmentIndex : 0
-            if loadout.weapons.indices.contains(slot),let weapon=wardrobe.weapons[loadout.weapons[slot]] {let gun=try original.model(weapon.model);a.bones[44].addChildNode(gun)}
+            if loadout.weapons.indices.contains(slot),let weapon=wardrobe.weapons[loadout.weapons[slot]] {let gun=try original.model(weapon.model);a.bones[44].addChildNode(gun);a.weaponPose=weapon.pose ?? "smg"}
             actor=a;a.node.simdEulerAngles.y=rotation;heroRoot.addChildNode(a.node);status.text="\(faction==1 ? "Royal" : "National") \(kind.rawValue)\nDrag your hero to rotate"
         } catch {actor=nil;status.text="This outfit could not be loaded"}
     }

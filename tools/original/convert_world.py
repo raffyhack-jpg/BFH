@@ -65,7 +65,8 @@ def main():
         image=Image.open(io.BytesIO(data)).convert('RGBA')
         # Color-map alpha is often gloss, not transparency.
         if archive is not archives['Vegitation']: image.putalpha(255)
-        file='textures/'+hashlib.sha256(data).hexdigest()[:16]+'.png'; image.save(out/file,optimize=True)
+        file='textures/'+hashlib.sha256(data).hexdigest()[:16]+'.png'; 
+        if not (out/file).exists(): image.save(out/file,compress_level=6)
         textures[key]=file; return file
     def export_mesh(archive,name,identifier,geom=0):
         if identifier in meshes: return identifier

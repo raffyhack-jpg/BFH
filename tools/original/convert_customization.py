@@ -17,7 +17,7 @@ def main():
     def record(archive,name,data): sources.append({'archive':str(archive.path.relative_to(base)),'entry':name,'sha256':hashlib.sha256(data).hexdigest()})
     def png(archive,name,folder):
         raw=archive.read(name);record(archive,name,raw);im=Image.open(io.BytesIO(raw)).convert('RGBA');file=folder+'/'+hashlib.sha256(raw).hexdigest()[:20]+'.png'
-        if not (out/file).exists(): im.save(out/file,optimize=True)
+        if not (out/file).exists(): im.save(out/file,compress_level=6)
         return file,list(im.size)
     def value(text,key):
         m=re.search(r'^\s*'+re.escape(key)+r'\s+([^\r\n]+)',text,re.I|re.M);return m[1].strip().strip('"') if m else None
@@ -30,7 +30,7 @@ def main():
             if not mat.vertices or not mat.faces or not rig.bones:continue
             part={'positions':[],'normals':[],'uv':[],'weights':[],'indices':[],'faces':[],'boneIDs':[b.id for b in rig.bones],'inverseBind':[],'materialType':kind}
             for v in mat.vertices:
-                p=v.position;n=v.normal;uv=v.texcoord0;w=v.blendweight[0] if v.blendweight else 1
+                p=v.position;n=v.normal;uv=v.texcoord0;w=max(0,min(1,v.blendweight[0])) if v.blendweight else 1
                 part['positions']+= [p[0],p[1],-p[2]];part['normals'] += [n[0],n[1],-n[2]];part['uv'] += [uv[0],1-uv[1]]
                 weights=[w,1-w];indices=list(v.blendindices[:2]) if v.blendindices else [0,0]
                 for i in range(2):
@@ -61,7 +61,8 @@ def main():
             if not file:continue
             file=file.lower().replace('\\','/').replace('objects/items/','')
             if file not in client.entries:continue
-            image,size=png(client,file,'textures');templates[key]={'kind':'texture','materialType':kind,'mesh':None,'texture':image,'coordinate':[int(v) for v in coord.split('/')],'size':size}
+            image,size=png(client,file,'textures');match=re.search(r'(-?\d+)\s*/\s*(-?\d+)',coord);coordinate=[int(match[1]),int(match[2])] if match else [0,0];templates[key]={'kind':'texture','materialType':kind,'mesh':None,'texture':image,'coordinate':coordinate,'size':size}
+    print('Converted original clothing templates:',len(templates),flush=True)
     localization={};local=base/'Localization/strings.csv'
     if local.exists():
         data=local.read_bytes();text=data.decode('utf16' if data[:2] in [b'\xff\xfe',b'\xfe\xff'] else 'utf-8-sig',errors='replace');rows=list(csv.reader(io.StringIO(text),delimiter='\t'))
@@ -100,29 +101,37 @@ def main():
         if not name.endswith('.con'):continue
         text=ws.read(name).decode('latin1');aid=value(text,'ObjectTemplate.assetId');geometry=value(text,'ObjectTemplate.geometry')
         if not aid or not aid.isdigit() or not geometry:continue
-        weapondefs[int(aid)]={'model':geometry.lower(),'rpm':float(value(text,'ObjectTemplate.fire.roundsPerMinute') or 300),'magazine':int(value(text,'ObjectTemplate.ammo.magSize') or 30),'reload':float(value(text,'ObjectTemplate.ammo.reloadTime') or 2)}
+        animation=value(text,'ObjectTemplate.AnimationSystem3p') or '';match=re.search(r'animations[/\\]([^/\\]+)',animation,re.I);pose=match[1].lower() if match else 'smg'
+        weapondefs[int(aid)]={'pose':pose,'model':geometry.lower(),'rpm':float(value(text,'ObjectTemplate.fire.roundsPerMinute') or 300),'magazine':int(value(text,'ObjectTemplate.ammo.magSize') or 30),'reload':float(value(text,'ObjectTemplate.ammo.reloadTime') or 2)}
     for item in ET.fromstring(server.read('weapons.xml')).findall('.//item'):
         id=int(item.get('id'));d=weapondefs.get(id)
         if not d or d["model"] not in world["meshAssets"]:continue
         weapons.append({'id':id,'name':title(id,item.findtext('displayName') or str(id)),'faction':int(item.findtext('faction','0')),'kits':int(item.findtext('kits','7')),'weaponClass':int(item.findtext('class','0')),'icon':icon(id),**d})
     catalog={'items':items,'templates':templates,'defaults':defaults,'colors':colors,'weapons':weapons}
     (out/'catalog.json').write_text(json.dumps(catalog,separators=(',',':')))
-    (out/'provenance.json').write_text(json.dumps({'client':'Battlefield Heroes 1.105','sources':sources,'unresolved':unresolved},indent=2))
     soldiers=Archive(base/'Objects/Soldiers_server.zip')
     print('ORIGINAL WEAPON POSE CLIPS',[n for n in soldiers.entries if n.startswith('british_male_soldier/animations/') and n.endswith('.baf') and any(t in n for t in ['idle','runforward','fire'])][:110])
     for name in soldiers.entries:
         if name.startswith('british_male_soldier/animations/') and name.endswith('animationsystem3p.inc') and '/smg/' not in name:
             print('ORIGINAL WEAPON ANIMATION SYSTEM',name,soldiers.read(name).decode('latin1')[:2200])
 
+    def clip(source):
+        raw=soldiers.read(source);record(soldiers,source,raw);temp=out/'temp.baf';temp.write_bytes(raw);anim=BF2Animation(str(temp));temp.unlink()
+        tracks={str(bone):[[f.pos.x,f.pos.y,-f.pos.z,-f.rot.x,-f.rot.y,f.rot.z,f.rot.w] for f in frames] for bone,frames in anim.bones.items()}
+        return {'frames':anim.frame_num,'fps':30,'tracks':tracks}
     for faction,prefix in [('royal','british_male_soldier'),('national','german_male_soldier')]:
         path=Path('Assets/Characters')/(faction+'-rig.json');rig=json.loads(path.read_text())
         for key,filename in [('jumpStart','stilljumpstart.baf'),('jumpLoop','stilljumploop.baf'),('jumpEnd','stilljumpend.baf')]:
             source=prefix+'/animations/common/'+filename
             if source not in soldiers.entries:continue
-            temp=out/'temp.baf';temp.write_bytes(soldiers.read(source));anim=BF2Animation(str(temp));temp.unlink();tracks={}
-            for bone,frames in anim.bones.items():
-                tracks[str(bone)]=[[f.pos.x,f.pos.y,-f.pos.z,-f.rot.x,-f.rot.y,f.rot.z,f.rot.w] for f in frames]
-            rig['clips'][key]={'frames':anim.frame_num,'fps':30,'tracks':tracks}
+            rig['clips'][key]=clip(source)
+        groups=sorted(set(w['pose'] for w in weapons))
+        for group in groups:
+            names=[n for n in soldiers.entries if n.startswith(prefix+'/animations/'+group+'/') and n.endswith('.baf')]
+            for logical,suffixes in [('Idle',['_idle1.baf','_idle.baf','_stand.baf']),('Run',['_runforward.baf']),('Fire',['_standfire.baf','_fire.baf']),('Reload',['_standreload.baf','_reload.baf'])]:
+                source=next((n for suffix in suffixes for n in names if n.endswith(suffix)),None)
+                if source:rig['clips'][group+logical]=clip(source)
         path.write_text(json.dumps(rig,separators=(',',':')))
+    (out/'provenance.json').write_text(json.dumps({'client':'Battlefield Heroes 1.105','sources':sources,'unresolved':unresolved},indent=2))
     print('Original wardrobe converted:',len(items),'items,',len(templates),'templates,',len(weapons),'weapons. Unresolved clothing:',len(unresolved))
 if __name__=='__main__':main()

@@ -16,6 +16,7 @@ struct RigAsset: Decodable { let bones:[RigBone]; let parts:[RigPart]; let clips
 final class AnimatedCharacter {
     let node=SCNNode(); let visual=SCNNode(); let asset:RigAsset; let bones:[SCNNode]
     var clock=0.0; var fireUntil=0.0; var abilityUntil=0.0; var deathTime=0.0
+    var weaponPose="smg",reloadClock=0.0,wasReloading=false
     var jumpClock=0.0;var wasJumping=false
     var lastPosition=SIMD2<Float>(0,0); var hasPosition=false
     static var cache:[String:RigAsset]=[:]
@@ -75,14 +76,15 @@ final class AnimatedCharacter {
         let q=simd_slerp(simd_normalize(simd_quatf(ix:a[3],iy:a[4],iz:a[5],r:a[6])),simd_normalize(simd_quatf(ix:b[3],iy:b[4],iz:b[5],r:b[6])),t)
         return (p,q)
     }
-    func update(_ dt:Double, position:V2, moving:Bool, firing:Bool, ability:Bool, alive:Bool,jumping:Bool=false) {
+    func update(_ dt:Double, position:V2, moving:Bool, firing:Bool, ability:Bool, alive:Bool,jumping:Bool=false,reloading:Bool=false) {
         clock+=dt
+        if reloading { reloadClock=wasReloading ? reloadClock+dt : 0 };wasReloading=reloading
         if jumping { jumpClock=wasJumping ? jumpClock+dt : 0 };wasJumping=jumping
         if firing { fireUntil=clock+0.22 }; if ability { abilityUntil=clock+0.45 }
         if !alive { deathTime+=dt } else { deathTime=0 }
         let death=asset.clips["death"]
         node.isHidden = !alive && deathTime>Double(death?.frames ?? 45)/Double(death?.fps ?? 30)+0.5
-        let clip=asset.clips[moving ? "run" : "idle"]!
+        let clip=asset.clips[weaponPose+(moving ? "Run" : "Idle")] ?? asset.clips[moving ? "run" : "idle"]!
         let lower=asset.clips[moving ? "locomotionRun" : "locomotionIdle"]
         let blend=Float(1-exp(-dt*16))
         for i in bones.indices {
@@ -94,8 +96,9 @@ final class AnimatedCharacter {
             if alive && jumping, let jump=asset.clips[jumpClock<0.2 ? "jumpStart" : "jumpLoop"],let pose=sample(jump,bone:i,time:jumpClock<0.2 ? jumpClock : jumpClock-0.2) { p=pose.0;q=pose.1 }
             if !alive, let death=death, let pose=sample(death,bone:i,time:deathTime,looping:false) { p=pose.0; q=pose.1 }
             // Preserve the locomotion legs while layering the original upper-body fire clip.
-            if alive, i>=2 && i<=57, clock<fireUntil, let fire=asset.clips["fire"], let pose=sample(fire,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if alive && !reloading, i>=2 && i<=57, clock<fireUntil, let fire=asset.clips[weaponPose+"Fire"] ?? asset.clips["fire"], let pose=sample(fire,bone:i,time:clock) { p=pose.0; q=pose.1 }
             if alive, i>=2 && i<=57, clock<abilityUntil, let skill=asset.clips["ability"], let pose=sample(skill,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if alive && reloading, i>=2 && i<=57,let reload=asset.clips[weaponPose+"Reload"],reloadClock<Double(reload.frames)/Double(reload.fps),let pose=sample(reload,bone:i,time:reloadClock,looping:false) { p=pose.0;q=pose.1 }
             if i==0 && alive { p.x=0;p.z=0;if jumping { p.y=bind.position[1] } }
             bones[i].simdPosition=simd_mix(bones[i].simdPosition,p,SIMD3(repeating:blend))
             bones[i].simdOrientation=simd_slerp(bones[i].simdOrientation,q,blend)
@@ -108,7 +111,7 @@ struct ClothingItem:Decodable { let id:Int,name:String,faction:Int,kits:Int,slot
 struct ClothingTemplate:Decodable { let kind:String,materialType:String;let mesh:String?,texture:String?;let coordinate:[Int],size:[Int] }
 struct WardrobeDefault:Decodable { let appearance:[Int],equipment:[Int] }
 struct WardrobeColor:Decodable { let id:Int,name:String,kind:String;let rgb:[Int] }
-struct WardrobeWeapon:Decodable { let id:Int,name:String,faction:Int,kits:Int,weaponClass:Int;let icon:String?;let model:String;let rpm:Double,magazine:Int,reload:Double }
+struct WardrobeWeapon:Decodable { let id:Int,name:String,faction:Int,kits:Int,weaponClass:Int;let icon:String?;let model:String;let rpm:Double,magazine:Int,reload:Double;let pose:String? }
 struct WardrobeCatalog:Decodable { let items:[ClothingItem],templates:[String:ClothingTemplate],defaults:[String:WardrobeDefault],colors:[WardrobeColor],weapons:[WardrobeWeapon] }
 struct HeroLoadout:Codable { var clothing:[Int:Int]=[:];var weapons:[Int]=[];var skin=7;var hair=2 }
 extension HeroClass {

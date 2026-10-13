@@ -11,9 +11,9 @@ permission; the MIT license covers original code only.
 - Native Swift/UIKit/SceneKit app for landscape iPhone, iOS 15+.
 - Offline 8v8: one player and fifteen bots, three classes (Soldier, Gunner, Commando).
 - Original Royal/National base models: 2,406 vertices and 2,286 triangles per
-  faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire/death clips.
+  faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire/death/jump clips; weapon-specific poses are imported during preparation.
 - Original heat map terrain, town buildings, trees, props and original object placements.
-- Original Royal/National SMG, machine gun and sniper meshes and textures.
+- Original v1.105 clothing catalog, meshes, texture layers, item icons and localized names.\n- Hero preview, faction/class selection, clothing categories, skin/hair palettes and saved loadouts.\n- Selectable original weapon models, two weapon slots, magazine counts, reloads and weapon animation poses.
 - Original sky dome/sky texture, capture flags and flagpole geometry.
 - Original Flash menu logo and scenic backdrop, imported without redrawing.
 - Conquest: capture the map objectives, drain enemy tickets, respawn.
@@ -28,8 +28,7 @@ permission; the MIT license covers original code only.
 
 ## Controls
 
-Left stick moves relative to camera; right stick turns camera; FIRE shoots;
-ABILITY activates the class skill. Combat uses horizontal hitscan with modest
+Left stick moves relative to camera. Drag the right side to look, or hold and drag\nFIRE to aim and shoot with one thumb. JUMP jumps; SWAP changes equipped weapon;\nRELOAD reloads the magazine. ABILITY activates the class skill. The follow camera\nkeeps world up fixed and pulls in before obstructing scenery. Combat uses horizontal hitscan with modest
 horizontal aim assistance. Pause opens Resume/New Match; backgrounding pauses.
 
 ## Build
@@ -53,7 +52,7 @@ team in Signing & Capabilities, set a unique bundle identifier, and build to you
 connected device in Xcode.
 
 GitHub Actions recovers the SHA-1 verified original 1.105 installer, converts
-original scenery and weapon files, validates them, then builds on macOS.
+original scenery, wardrobe, icons, localized item names, weapons and motion clips, validates them, then builds on macOS.
 Generated world assets are bundled in the IPA; they are not checked into Git.
 The source archive is about 1.2 GB, so first preparation needs a network connection
 and disk space. On macOS the preparation script installs innoextract through
@@ -142,3 +141,20 @@ the legacy base-mesh bone layout to the current skeleton. This requires visual
 device validation; original skeletal clips do not imply exact recreation of the
 full original animation state machine or ragdoll behavior. The native asset
 checks compile the animator, validate skin data, and exercise run/fire/death/reset.
+
+## Customization fidelity
+
+The wardrobe reads the original `items.xml`, `defaultcustomization.xml`, `colors.xml`,
+`weapons.xml`, CON geometry/texture definitions, item icons and English localization
+from the preserved 1.105 installer. It preserves original item IDs, faction/class
+restrictions, clothing slots and layer order. The UI is a native touch adaptation;
+it does not reproduce the complete original Flash interface. Asset definitions
+with unresolved or unusable render geometry are reported in generated provenance
+instead of being replaced with invented art. This source archive does not establish
+that every item added to the live game after this client revision is included.
+
+Weapon models, magazines, reload durations and animation groups come from the
+original definitions. Damage/range are still prototype values, projectile behavior
+and abilities are incomplete, and character texture composition needs device QA.
+The game remains an offline prototype with one map; it is not a complete identical
+recreation of every original mode, vehicle, unlock, audio cue or online feature.

@@ -28,8 +28,8 @@ innoextract --silent --output-dir build/original-client/extracted \
   --include app/mods/bfheroes/Localization \
   --include app/mods/bfheroes/Init.con \
   build/original-client/setup.exe
-build/asset-python/bin/python tools/original/convert_world.py \
+build/asset-python/bin/python -u tools/original/convert_world.py \
   build/original-client/extracted/app/mods/bfheroes Assets/OriginalWorld
-build/asset-python/bin/python tools/original/verify_world.py Assets/OriginalWorld
-build/asset-python/bin/python tools/original/convert_customization.py \
+build/asset-python/bin/python -u tools/original/verify_world.py Assets/OriginalWorld
+build/asset-python/bin/python -u tools/original/convert_customization.py \
   build/original-client/extracted/app/mods/bfheroes Assets/Wardrobe

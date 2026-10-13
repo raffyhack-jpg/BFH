@@ -21,8 +21,24 @@ jobs:
         with:
           path: build/original-client/client.rar
           key: bfh-client-7b77439053f6e79ebf5a9020b22aff85e49195e6
+      - name: Restore converted original images
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Assets/Wardrobe/textures
+            Assets/Wardrobe/icons
+            Assets/OriginalWorld/textures
+          key: bfh-original-images-7b77439053f6e79ebf5a9020b22aff85e49195e6-rgba-v1
       - name: Recover and convert original map and weapon assets
         run: bash scripts/prepare_original_assets.sh
+      - name: Cache converted original images
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            Assets/Wardrobe/textures
+            Assets/Wardrobe/icons
+            Assets/OriginalWorld/textures
+          key: bfh-original-images-7b77439053f6e79ebf5a9020b22aff85e49195e6-rgba-v1
       - name: Cache verified original client archive
         uses: actions/cache/save@v4
         with:
