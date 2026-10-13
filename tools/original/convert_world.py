@@ -140,6 +140,20 @@ def main():
         for kind,name in zip(['soldier','heavy','scout'],names):
             archive=archives['Weapons']; path=next(k for k in archive.entries if Path(k).stem==name and k.endswith('.bundledmesh'))
             weapons[faction+'-'+kind]=export_mesh(archive,path,name,geom=1)
+    weaponserver=Archive(base/'Objects/Weapons_server.zip')
+    converted=0;unresolvedweapons=[]
+    weaponpaths={Path(n).stem:n for n in archives['Weapons'].entries if n.endswith('.bundledmesh')}
+    for name in weaponserver.entries:
+        if not name.endswith('.con'):continue
+        text=weaponserver.read(name).decode('latin1')
+        asset=re.search(r'^\s*ObjectTemplate.assetId\s+(\d+)',text,re.I|re.M)
+        geometry=re.search(r'^\s*ObjectTemplate.geometry\s+(\S+)',text,re.I|re.M)
+        if not asset or not geometry:continue
+        model=geometry[1].strip('"').lower();path=weaponpaths.get(model)
+        if not path:unresolvedweapons.append(asset[1]);continue
+        try:export_mesh(archives['Weapons'],path,model,geom=1);converted+=1
+        except (KeyError,ValueError) as e:unresolvedweapons.append(asset[1]);print('Unresolved original weapon',asset[1],str(e))
+    print('Original selectable weapon models:',converted,'unresolved:',unresolvedweapons)
     flags={}
     for key,name in [('pole','flagpole'),('royal','flag_ra'),('national','flag_na'),('neutral','flag_neutral'),('ctf-royal','ctf_stationaryroyal'),('ctf-national','ctf_stationarynational')]:
         archive=archives['Common'];path=next(k for k in archive.entries if Path(k).stem==name and k.endswith(('.bundledmesh','.staticmesh','.skinnedmesh')))
