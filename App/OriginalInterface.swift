@@ -101,10 +101,10 @@ final class OriginalInventoryChrome:UIView {
 }
 
 final class OriginalXPBar:UIView {
-    let empty=UIImageView(image:OriginalUIArt.image("components/barxpemptyshorteor.png")),full=UIImageView(image:OriginalUIArt.image("components/barxpfullshorteor.png")),mask=CALayer()
+    let empty=UIImageView(image:OriginalUIArt.image("components/barxpemptyshorteor.png")),full=UIImageView(image:OriginalUIArt.image("components/barxpfullshorteor.png")),fillMask=CALayer()
     var progress:Float=0 {didSet{setNeedsLayout()}}
-    override init(frame:CGRect){super.init(frame:frame);addSubview(empty);addSubview(full);mask.backgroundColor=UIColor.white.cgColor;full.layer.mask=mask}
+    override init(frame:CGRect){super.init(frame:frame);addSubview(empty);addSubview(full);fillMask.backgroundColor=UIColor.white.cgColor;full.layer.mask=fillMask}
     convenience init(){self.init(frame:.zero)}
     required init?(coder:NSCoder){fatalError()}
-    override func layoutSubviews(){super.layoutSubviews();empty.frame=bounds;full.frame=bounds;CATransaction.begin();CATransaction.setDisableActions(true);mask.frame=CGRect(x:0,y:0,width:bounds.width*CGFloat(max(0,min(1,progress))),height:bounds.height);CATransaction.commit()}
+    override func layoutSubviews(){super.layoutSubviews();empty.frame=bounds;full.frame=bounds;CATransaction.begin();CATransaction.setDisableActions(true);fillMask.frame=CGRect(x:0,y:0,width:bounds.width*CGFloat(max(0,min(1,progress))),height:bounds.height);CATransaction.commit()}
 }
