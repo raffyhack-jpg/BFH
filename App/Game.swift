@@ -42,6 +42,7 @@ struct WeaponProfile {
     let id:Int,name:String
     let damage:Double,interval:Double,range:Double
     let magazine:Int,reloadTime:Double
+    var isMelee=false
 }
 final class Hero {
     let id: Int; let team: Int; let kind: HeroClass
@@ -263,7 +264,7 @@ final class Game {
     }
     func shoot(_ h: Hero, aim: V2, bot: Bool) {
         guard h.cooldown <= 0,h.reloadRemaining<=0 else { return }
-        if h.weapon != nil {
+        if let weapon=h.weapon,weapon.magazine>0 {
             if h.ammunition[h.weaponSlot]<=0 { reload(h);return }
             h.ammunition[h.weaponSlot]-=1
         }
@@ -285,7 +286,7 @@ final class Game {
                 if !free(p) { end=p; break }
             }
         }
-        shots.append(Shot(from:h.p,to:end,team:h.team))
+        if h.weapon?.isMelee != true { shots.append(Shot(from:h.p,to:end,team:h.team)) }
     }
     func ability(_ h: Hero) {
         guard h.ability <= 0, h.alive else { return }
@@ -333,9 +334,13 @@ final class Game {
             if h.think<=0 {
                 h.think=0.55+rng.next()*0.3; h.target=objective(for:h); h.path=route(h.p,h.target)
             }
-            let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<h.weaponRange && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
+            let detection=h.equipped.map(\.range).max() ?? h.weaponRange
+            let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<detection && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
             if let enemy=enemy {
                 let aim=enemy.p-h.p; h.facing=atan2(aim.x,aim.z)
+                if h.equipped.count>1 && (aim.length>h.weaponRange || h.reloadRemaining>0),let index=h.equipped.indices.first(where: { $0 != h.weaponSlot && h.equipped[$0].range>=aim.length && (h.equipped[$0].magazine==0 || h.ammunition[$0]>0) }) {
+                    h.weaponSlot=index;h.reloadRemaining=0;h.cooldown=0.2
+                }
                 shoot(h,aim:aim,bot:true)
                 if h.hp<h.kind.hp*0.55 || (h.kind == .heavy && aim.length<9) { ability(h) }
                 // Retreat toward base at critical health, otherwise strafe between shots.

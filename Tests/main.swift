@@ -63,3 +63,12 @@ equipmentGame.reload(equipped);for _ in 0..<10 {equipmentGame.update(0.05,input:
 for _ in 0..<11 {equipmentGame.update(0.05,input:Input())};precondition(equipped.ammunition[0]==2 && equipped.reloadRemaining==0)
 equipmentGame.switchWeapon(equipped);precondition(equipped.weapon?.id==2 && equipped.ammunition[1]==8)
 print("Validated selectable faction, weapon magazines, reload timing and two equipment slots")
+
+let meleeGame=Game(mode:.conquest,hero:.scout)
+let blade=meleeGame.heroes[0],closeTarget=meleeGame.heroes[8]
+blade.equip([WeaponProfile(id:3,name:"Knife",damage:35,interval:0.5,range:2.8,magazine:0,reloadTime:0,isMelee:true)])
+closeTarget.p=blade.p+V2(x:1,z:0);closeTarget.invulnerable=0
+meleeGame.shoot(blade,aim:V2(x:1,z:0),bot:false)
+check(closeTarget.hp==closeTarget.kind.hp-35 && meleeGame.shots.isEmpty,"Knife must strike nearby targets without a bullet tracer")
+check(blade.ammunition[0]==0 && blade.reloadRemaining==0,"Knife must not consume ammunition")
+print("Validated close-range melee equipment without bullet traces or magazine reloads")

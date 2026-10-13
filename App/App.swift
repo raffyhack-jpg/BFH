@@ -108,6 +108,7 @@ final class GameController: UIViewController {
         guard let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Characters"),let original=originalWorld else { throw CocoaError(.fileReadNoSuchFile) }
         let animator=try AnimatedCharacter(team == 0 ? "royal" : "national",directory:directory)
         if let wardrobe=wardrobe { try wardrobe.apply(loadout ?? wardrobe.defaults(team+1,kind),faction:team+1,to:animator) }
+        animator.weaponID=loadout?.weapons.first
         animator.weaponPose=loadout?.weapons.first.flatMap{wardrobe?.weapons[$0]?.pose} ?? "smg"
         animators.append(animator)
         let root=animator.node
@@ -160,6 +161,9 @@ final class GameController: UIViewController {
         g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false,jump:jumpRequested));jumpRequested=false
         for (i,h) in g.heroes.enumerated() {
             nodes[i].position=SCNVector3(Float(h.p.x),(originalWorld?.height(h.p) ?? 0)+Float(h.elevation),Float(h.p.z)); nodes[i].eulerAngles.y=Float(h.facing); if let animator=animators[i] {
+                if let id=h.weapon?.id,id != animator.weaponID,let weapon=wardrobe?.weapons[id],let original=originalWorld,let node=try? original.model(weapon.model) {
+                    animator.bones[44].childNodes.filter{$0.name=="held-weapon"}.forEach{$0.removeFromParentNode()};node.name="held-weapon";animator.bones[44].addChildNode(node);animator.weaponID=id;animator.weaponPose=weapon.pose ?? "smg"
+                }
                 animator.update(dt,position:h.p,moving:h.p.distance(previousPositions[i])>0.003,firing:h.recentShot>0,ability:h.ability>11.5,alive:h.alive,jumping:h.elevation>0.01,reloading:h.reloadRemaining>0)
 
             } else { nodes[i].isHidden = !h.alive }
@@ -188,7 +192,7 @@ final class GameController: UIViewController {
             let scores=g.mode == .conquest ? "ROYAL \(max(0,Int(g.tickets[0]))) : \(max(0,Int(g.tickets[1]))) NATIONAL" : g.mode == .elimination ? "ROYAL \(g.heroes.filter{$0.team == 0 && $0.alive}.count) : \(g.heroes.filter{$0.team == 1 && $0.alive}.count) NATIONAL" : "ROYAL \(Int(g.score[0])) : \(Int(g.score[1])) NATIONAL"
             hud.text="\(scores)   •   \(max(0,300-Int(g.elapsed)))s\n\(player.kind.rawValue)  HP \(Int(player.hp))  K \(player.kills) / D \(player.deaths)"
             let gun=player.weapon?.name ?? player.kind.rawValue
-            let ammo=player.ammunition.indices.contains(player.weaponSlot) ? String(player.ammunition[player.weaponSlot]) : "∞"
+            let ammo=player.weapon?.magazine==0 ? "∞" : player.ammunition.indices.contains(player.weaponSlot) ? String(player.ammunition[player.weaponSlot]) : "∞"
             hud.text=(hud.text ?? "")+"  •  \(gun)  \(ammo)"
             reloadButton.setTitle(player.reloadRemaining>0 ? String(format:"%.1fs",player.reloadRemaining) : "RELOAD",for:.normal)
             switchButton.setTitle("WEAPON \(player.weaponSlot+1) ⇄",for:.normal)
@@ -236,6 +240,8 @@ final class GameController: UIViewController {
 
 extension GameController {
     func weaponProfile(_ weapon:WardrobeWeapon)->WeaponProfile {
+        let melee=weapon.weaponType?.lowercased().contains("knife")==true || (weapon.pose?.contains("knife") ?? false) || (weapon.pose?.contains("sword") ?? false) || weapon.pose=="machete" || weapon.pose=="fist"
+        if melee { return WeaponProfile(id:weapon.id,name:weapon.name,damage:35,interval:max(0.5,60/max(60,weapon.rpm)),range:2.8,magazine:0,reloadTime:0,isMelee:true) }
         let damage=weapon.weaponClass==5 ? 36.0 : weapon.weaponClass==3 ? 28 : weapon.weaponClass==2 ? 22 : weapon.weaponClass==1 ? 13 : 19
         let range=weapon.weaponClass==5 ? 45.0 : weapon.weaponClass==3 ? 16 : weapon.weaponClass==2 ? 24 : 28
         return WeaponProfile(id:weapon.id,name:weapon.name,damage:damage,interval:60/max(60,weapon.rpm),range:range,magazine:max(1,weapon.magazine),reloadTime:max(0.1,weapon.reload))
@@ -244,6 +250,7 @@ extension GameController {
         guard let g=game,!g.paused,g.winner==nil,let actor=animators.first ?? nil,let original=originalWorld else{return}
         g.switchWeapon(g.heroes[0])
         guard let id=g.heroes[0].weapon?.id,let item=wardrobe?.weapons[id],let node=try? original.model(item.model) else{return}
+        actor.weaponID=item.id
         actor.weaponPose=item.pose ?? "smg"
         actor.bones[44].childNodes.filter{$0.name=="held-weapon"}.forEach{$0.removeFromParentNode()};node.name="held-weapon";actor.bones[44].addChildNode(node)
     }

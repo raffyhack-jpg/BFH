@@ -17,6 +17,8 @@ def main():
     def record(archive,name,data): sources.append({'archive':str(archive.path.relative_to(base)),'entry':name,'sha256':hashlib.sha256(data).hexdigest()})
     def png(archive,name,folder):
         raw=archive.read(name);record(archive,name,raw);im=Image.open(io.BytesIO(raw)).convert('RGBA');file=folder+'/'+hashlib.sha256(raw).hexdigest()[:20]+'.png'
+        if name.lower().endswith('head001_head001.tga'):
+            rgba=np.array(im);print('ORIGINAL HEAD PIXEL DATA',name,im.size,'alpha',np.unique(rgba[:,:,3],return_counts=True),'top colors', sorted([(int(count),list(color)) for color,count in zip(*np.unique(rgba.reshape(-1,4),axis=0,return_counts=True))],reverse=True)[:10])
         if not (out/file).exists(): im.save(out/file,compress_level=6)
         return file,list(im.size)
     def value(text,key):
@@ -102,7 +104,7 @@ def main():
         text=ws.read(name).decode('latin1');aid=value(text,'ObjectTemplate.assetId');geometry=value(text,'ObjectTemplate.geometry')
         if not aid or not aid.isdigit() or not geometry:continue
         animation=value(text,'ObjectTemplate.AnimationSystem3p') or '';match=re.search(r'animations[/\\]([^/\\]+)',animation,re.I);pose=match[1].lower() if match else 'smg'
-        weapondefs[int(aid)]={'pose':pose,'model':geometry.lower(),'rpm':float(value(text,'ObjectTemplate.fire.roundsPerMinute') or 300),'magazine':int(value(text,'ObjectTemplate.ammo.magSize') or 30),'reload':float(value(text,'ObjectTemplate.ammo.reloadTime') or 2)}
+        weapondefs[int(aid)]={'weaponType':value(text,'ObjectTemplate.weaponsItemType'),'pose':pose,'model':geometry.lower(),'rpm':float(value(text,'ObjectTemplate.fire.roundsPerMinute') or 300),'magazine':int(value(text,'ObjectTemplate.ammo.magSize') or 30),'reload':float(value(text,'ObjectTemplate.ammo.reloadTime') or 2)}
     for item in ET.fromstring(server.read('weapons.xml')).findall('.//item'):
         id=int(item.get('id'));d=weapondefs.get(id)
         if not d or d["model"] not in world["meshAssets"]:continue
@@ -125,12 +127,22 @@ def main():
             source=prefix+'/animations/common/'+filename
             if source not in soldiers.entries:continue
             rig['clips'][key]=clip(source)
-        groups=sorted(set(w['pose'] for w in weapons))
+        groups=sorted(set(w['pose'] for w in weapons));aliases={};seen={}
         for group in groups:
             names=[n for n in soldiers.entries if n.startswith(prefix+'/animations/'+group+'/') and n.endswith('.baf')]
+            inc=prefix+'/animations/'+group+'/animationsystem3p.inc'
+            if inc in soldiers.entries:
+                text=soldiers.read(inc).decode('latin1')
+                for reference in re.findall(r'animationSystem.createAnimation\s+(\S+\.baf)',text,re.I):
+                    reference=reference.lower().replace('\\','/').removeprefix('objects/soldiers/')
+                    if reference in soldiers.entries and '/common/' not in reference:names.append(reference)
             for logical,suffixes in [('Idle',['_idle1.baf','_idle.baf','_stand.baf']),('Run',['_runforward.baf']),('Fire',['_standfire.baf','_fire.baf']),('Reload',['_standreload.baf','_reload.baf'])]:
                 source=next((n for suffix in suffixes for n in names if n.endswith(suffix)),None)
-                if source:rig['clips'][group+logical]=clip(source)
+                if source:
+                    if source not in seen:
+                        name='original-'+hashlib.sha256(source.encode()).hexdigest()[:16];seen[source]=name;rig['clips'][name]=clip(source)
+                    aliases[group+logical]=seen[source]
+        rig['clipAliases']=aliases
         path.write_text(json.dumps(rig,separators=(',',':')))
     (out/'provenance.json').write_text(json.dumps({'client':'Battlefield Heroes 1.105','sources':sources,'unresolved':unresolved},indent=2))
     print('Original wardrobe converted:',len(items),'items,',len(templates),'templates,',len(weapons),'weapons. Unresolved clothing:',len(unresolved))
