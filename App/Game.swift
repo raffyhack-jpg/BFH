@@ -291,6 +291,17 @@ final class Game {
         guard h.alive,h.equipped.count>1 else { return }
         h.weaponSlot=(h.weaponSlot+1)%h.equipped.count;h.reloadRemaining=0;h.cooldown=0.2
     }
+    func reticlePoint(origin:V3,direction:V3,excluding:Int,range:Double=150)->V3 {
+        let direction=direction.unit,end=origin+direction*range
+        let obstruction=shotObstacle?(origin,end) ?? end
+        let limit=(obstruction-origin).length
+        let distance=heroes.filter{$0.id != excluding && $0.alive}.compactMap { h -> Double? in
+            let feet=V3(x:h.p.x,y:groundHeight(h.p)+h.elevation,z:h.p.z)
+            guard let hit=capsuleHit(origin:origin,direction:direction,feet:feet),hit<limit else { return nil }
+            return hit
+        }.min()
+        return distance.map{origin+direction*$0} ?? obstruction
+    }
     func shoot(_ h: Hero, aim: V2, bot: Bool, aimPoint:V3?=nil) {
         guard h.cooldown <= 0,h.reloadRemaining<=0 else { return }
         if let weapon=h.weapon,weapon.magazine>0 {

@@ -174,9 +174,8 @@ final class GameController: UIViewController {
         skyNode?.position=camera.position
         let rayOrigin=camera.simdPosition
         let rayDirection=simd_normalize(focus+direction*30+shoulder-rayOrigin)
-        let distant=rayOrigin+rayDirection*150
-        let reticlePoint=originalWorld?.shotEnd(from:rayOrigin,to:distant) ?? distant
-        let aimPoint=V3(x:Double(reticlePoint.x),y:Double(reticlePoint.y),z:Double(reticlePoint.z))
+        let aimPoint=g.reticlePoint(origin:V3(x:Double(rayOrigin.x),y:Double(rayOrigin.y),z:Double(rayOrigin.z)),
+                                   direction:V3(x:Double(rayDirection.x),y:Double(rayDirection.y),z:Double(rayDirection.z)),excluding:player.id)
         g.update(dt,input:Input(move:move,yaw:yaw,fire:firing,ability:false,jump:jumpRequested,aimPoint:aimPoint));jumpRequested=false
 
         for (i,h) in g.heroes.enumerated() {

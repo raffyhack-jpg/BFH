@@ -94,3 +94,12 @@ aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:V3(x:0,y:4.1,z:10))
 check(raised.hp==raised.kind.hp-20 && friend.hp==friend.kind.hp,"A teammate must stop the ray without friendly damage")
 check(capsuleHit(origin:V3(x:0,y:1,z:0),direction:V3(x:0,y:0,z:1),feet:V3(x:0,y:0,z:10))!<10,"Capsule intersection must hit the front surface")
 print("Validated crosshair height, airborne targets, scenery obstruction and teammate shielding")
+
+aimingGame.heroes[1].p=V2(x:-20,z:15)
+let cameraOrigin=V3(x:-0.55,y:1.5,z:-4.6),bodyPoint=V3(x:0,y:4.1,z:10)
+let reticle=aimingGame.reticlePoint(origin:cameraOrigin,direction:(bodyPoint-cameraOrigin).unit,excluding:marksman.id)
+check(reticle.z<10 && reticle.z>9,"Crosshair must converge on a visible character before the background")
+marksman.cooldown=0
+aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:reticle)
+check(raised.hp==raised.kind.hp-40,"Shoulder camera parallax must not miss the selected target")
+print("Validated shoulder-camera crosshair convergence on characters")
