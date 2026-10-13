@@ -138,3 +138,20 @@ knifeBot.equip([WeaponProfile(id:5,name:"Knife",damage:35,interval:0.5,range:2.8
 check(pursuit.preferredWeapon(knifeBot,distance:15)==1,"Bot must select its ranged weapon for a distant enemy")
 check(pursuit.preferredWeapon(knifeBot,distance:2)==0,"Bot must select its stronger melee weapon at close range")
 print("Validated flag return, split retrieval/escort squads, melee pursuit and bot movement budgets")
+
+let returnTrip=Game(mode:.flags,hero:.soldier)
+for h in returnTrip.heroes { h.hp=0;h.respawn=10000 }
+let runner=returnTrip.heroes[1];runner.hp=runner.kind.hp;runner.p=V2(x:22,z:0)
+returnTrip.flags[1].carrier=runner.id;returnTrip.flags[1].p=runner.p
+for _ in 0..<600 { returnTrip.update(0.05);if returnTrip.score[0]>0 { break } }
+check(returnTrip.score[0]==1,"Bot carrier must navigate the buildings and complete a capture without teleporting")
+
+let fieldMedic=Game(mode:.flags,hero:.soldier)
+for h in fieldMedic.heroes { h.hp=0;h.respawn=10000 }
+let medic=fieldMedic.heroes[3],patient=fieldMedic.heroes[4]
+medic.hp=medic.kind.hp;medic.p=V2(x:0,z:0);medic.think=1000
+patient.hp=patient.kind.hp*0.4;patient.p=V2(x:1,z:0);patient.think=1000
+let injury=patient.hp
+fieldMedic.update(0.05)
+check(patient.hp>injury && medic.ability>0,"Healthy soldier bot must heal a wounded teammate even between fights")
+print("Validated autonomous flag capture around buildings and proactive squad healing")

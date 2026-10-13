@@ -411,6 +411,7 @@ final class Game {
             }
             let detection=max(10,h.equipped.map(\.range).max() ?? h.weaponRange)
             let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<detection && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
+            if h.kind == .soldier && heroes.contains(where: { $0.team==h.team && $0.alive && $0.hp<$0.kind.hp*0.65 && $0.p.distance(h.p)<6.5 }) { ability(h) }
             var movement=V2.zero
             while let next=h.path.first,h.p.distance(next)<0.6 { h.path.removeFirst() }
             if let next=h.path.first { movement=(next-h.p).unit }
@@ -420,7 +421,14 @@ final class Game {
                     h.weaponSlot=index;h.reloadRemaining=0;h.cooldown=max(h.cooldown,0.2)
                 }
                 shoot(h,aim:aim,bot:true,aimPoint:shotObstacle == nil ? nil : V3(x:enemy.p.x,y:groundHeight(enemy.p)+enemy.elevation+1.1,z:enemy.p.z))
-                if h.hp<h.kind.hp*0.55 || (h.kind == .heavy && aim.length<9) { ability(h) }
+                if h.hp<h.kind.hp*0.55 || (h.kind == .heavy && aim.length<9) {
+                    let facing=h.facing
+                    if h.kind == .scout {
+                        let escape=(h.path.first ?? objective(for:h))-h.p
+                        if escape.length>0.1 { h.facing=atan2(escape.x,escape.z) }
+                    }
+                    ability(h);h.facing=facing
+                }
                 if !flagCarrier(h) && h.hp>=h.kind.hp*0.25 {
                     if h.weapon?.isMelee==true && aim.length<h.weaponRange+3 {
                         movement=aim.length>h.weaponRange*0.7 ? aim.unit : .zero
