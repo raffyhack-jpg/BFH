@@ -126,11 +126,11 @@ if let device=MTLCreateSystemDefaultDevice() {
     let scene=SCNScene();scene.background.contents=NSColor(calibratedWhite:0.14,alpha:1)
     let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=800;scene.rootNode.addChildNode(ambient)
     let sun=SCNNode();sun.light=SCNLight();sun.light?.type = .directional;sun.light?.intensity=1000;sun.eulerAngles=SCNVector3(-0.5,-0.4,0);scene.rootNode.addChildNode(sun)
-    let candidates:[[String:[Int]]]=[[:],["cit_head":[512,320],"cit_legs":[512,256]],["cit_head":[512,512],"cit_legs":[512,256]],["cit_head":[464,304],"cit_legs":[384,256]]]
+    let candidates:[[String:[Int]]]=[[:],["cit_head":[464,304],"cit_legs":[384,384],"cit_feet":[192,128]],["cit_head":[464,304],"cit_legs":[384,256],"cit_feet":[192,128]],["cit_head":[512,320],"cit_legs":[512,256]]]
     for (index,canvas) in candidates.enumerated() {
         let actor=try AnimatedCharacter("royal",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
         try wardrobe.apply(wardrobe.defaults(1,.soldier),faction:1,to:actor,canvasOverrides:canvas)
-        actor.node.position.x=Float(index)*1.5-2.25
+        actor.node.position=SCNVector3(Float(index)*1.5-2.25,0,0)
         for _ in 0..<10 {actor.update(1.0/30,position:.zero,moving:false,firing:false,ability:false,alive:true)}
         scene.rootNode.addChildNode(actor.node)
     }

@@ -147,6 +147,20 @@ final class OriginalWardrobe {
         guard let source=CGImageSourceCreateWithURL(directory.appendingPathComponent(file) as CFURL,nil),let image=CGImageSourceCreateImageAtIndex(source,0,nil) else { return nil }
         let cost=image.bytesPerRow*image.height;if imageBytes+cost>48*1024*1024 { imageCache.removeAll();imageBytes=0 };imageCache[file]=image;imageBytes+=cost;return image
     }
+    func tinted(_ image:CGImage,tone:[Int])->CGImage {
+        guard let context=CGContext(data:nil,width:image.width,height:image.height,bitsPerComponent:8,bytesPerRow:image.width*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),let data=context.data else {return image}
+        context.draw(image,in:CGRect(x:0,y:0,width:image.width,height:image.height))
+        let pixels=data.bindMemory(to:UInt8.self,capacity:image.width*image.height*4)
+        for i in stride(from:0,to:image.width*image.height*4,by:4) {
+            let r=Int(pixels[i]),g=Int(pixels[i+1]),b=Int(pixels[i+2]),a=Int(pixels[i+3])
+            // The original base skin maps use a neutral shading color. Keep
+            // colored details and bright eye whites while applying the palette.
+            if a>0 && max(r,max(g,b))-min(r,min(g,b))<24 && max(r,max(g,b))<225 {
+                pixels[i]=UInt8(min(a,r*tone[0]/128));pixels[i+1]=UInt8(min(a,g*tone[1]/128));pixels[i+2]=UInt8(min(a,b*tone[2]/128))
+            }
+        }
+        return context.makeImage() ?? image
+    }
     func parts(_ file:String)throws->[RigPart] {
         if let cached=meshCache[file] { return cached }
         let parts=try JSONDecoder().decode([RigPart].self,from:Data(contentsOf:directory.appendingPathComponent(file)));if meshCache.count>40 { meshCache.removeAll() };meshCache[file]=parts;return parts
@@ -170,7 +184,11 @@ final class OriginalWardrobe {
             guard let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:width*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
             let tone=catalog.colors.first{$0.kind==(type.contains("hair") ? "hair" : "skin") && $0.id==(type.contains("hair") ? loadout.hair : loadout.skin)}?.rgb ?? [153,119,86]
             context.setFillColor(CGColor(red:CGFloat(tone[0])/255,green:CGFloat(tone[1])/255,blue:CGFloat(tone[2])/255,alpha:1));context.fill(CGRect(x:0,y:0,width:width,height:height))
-            for layer in stack { if let file=layer.texture,let im=image(file) { context.draw(im,in:CGRect(x:layer.coordinate[0],y:height-layer.coordinate[1]-im.height,width:im.width,height:im.height)) } }
+            for layer in stack { if let file=layer.texture,let original=image(file) {
+                let skinBase=file==catalog.templates[prefix+"head001_head001"]?.texture || file==catalog.templates[prefix+"body001_body001"]?.texture
+                let im=skinBase || type.contains("hair") ? tinted(original,tone:tone) : original
+                context.draw(im,in:CGRect(x:layer.coordinate[0],y:height-layer.coordinate[1]-im.height,width:im.width,height:im.height))
+            } }
             materials[type]=context.makeImage()
         }
         var finalParts:[RigPart]=[];for (_,file) in meshes.sorted(by:{$0.key<$1.key}) { finalParts += try parts(file) }

@@ -28,6 +28,10 @@ def main():
         candidates=[g.lods[0] for g in model.geoms if g.lods and any(r.bones for r in g.lods[0].rigs)]
         if not candidates:raise ValueError('No weighted render geometry: '+name)
         lod=max(candidates,key=lambda l:sum(len(m.vertices) for m,r in zip(l.materials,l.rigs) if r.bones));parts=[]
+        if name in ['bri_m_head001','bri_m_body002','bri_m_legs002','bri_m_feet002']:
+            for mat in lod.materials:
+                uv=np.array([v.texcoord0 for v in mat.vertices])
+                if len(uv):print('ORIGINAL DEFAULT UV EXTENTS',name,uv.min(0).tolist(),uv.max(0).tolist(),'vertex colors',set(v.color for v in mat.vertices))
         for mat,rig in zip(lod.materials,lod.rigs):
             if not mat.vertices or not mat.faces or not rig.bones:continue
             part={'positions':[],'normals':[],'uv':[],'weights':[],'indices':[],'faces':[],'boneIDs':[b.id for b in rig.bones],'inverseBind':[],'materialType':kind}
