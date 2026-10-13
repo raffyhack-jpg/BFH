@@ -60,7 +60,7 @@ final class OriginalWorld {
             root.addChildNode(node)
         }
         let water=SCNPlane(width:512,height:512);water.firstMaterial?.diffuse.contents=waterColor
-        let waterNode=SCNNode(geometry:water);waterNode.eulerAngles.x = -.pi/2;waterNode.position.y=Float(map.waterHeight);root.addChildNode(waterNode)
+        let waterNode=SCNNode(geometry:water);waterNode.eulerAngles.x = -.pi/2;waterNode.simdPosition.y=Float(map.waterHeight);root.addChildNode(waterNode)
     }
     private var waterColor:Any { CGColor(red:0.24,green:0.41,blue:0.48,alpha:0.93) }
     func flag(_ key:String) throws -> SCNNode {

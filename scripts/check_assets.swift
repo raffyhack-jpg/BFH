@@ -43,7 +43,7 @@ if let device=MTLCreateSystemDefaultDevice() {
     let sun=SCNNode();sun.light=SCNLight();sun.light?.type = .directional;sun.light?.intensity=1100;sun.eulerAngles=SCNVector3(-0.9,-0.6,0);preview.rootNode.addChildNode(sun)
     let player=try AnimatedCharacter("royal",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
     let spawn=mapGame.bases[0],toward=(mapGame.objectives[0].p-spawn).unit
-    player.node.position=SCNVector3(Float(spawn.x),original.height(spawn),Float(spawn.z));player.node.eulerAngles.y=Float(atan2(toward.x,toward.z))
+    player.node.position=SCNVector3(Float(spawn.x),original.height(spawn),Float(spawn.z));player.node.simdEulerAngles.y=Float(atan2(toward.x,toward.z))
     player.bones[44].addChildNode(try original.weapon(.soldier,0));preview.rootNode.addChildNode(player.node)
     let camera=SCNNode();camera.camera=SCNCamera();camera.camera?.fieldOfView=68;camera.camera?.zFar=600
     camera.position=SCNVector3(Float(spawn.x-toward.x*5.5),original.height(spawn)+3.4,Float(spawn.z-toward.z*5.5))
