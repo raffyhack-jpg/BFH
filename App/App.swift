@@ -61,7 +61,7 @@ final class GameController: UIViewController {
     let effects=SCNNode(); let world=SCNNode(); let hud=UILabel(); let notice=ComicLabel()
     var left=Stick(frame:CGRect(x:0,y:0,width:116,height:116)); let right=AimSurface(),fire=AimSurface()
     let skill=UIButton(type:.system),pause=UIButton(type:.system),jumpButton=UIButton(type:.system)
-    let crosshair=UILabel()
+    let crosshair=OriginalCrosshair()
     var jumpRequested=false,cameraReady=false
     var firing=false; var yaw=Double.pi/2; var pitch=0.2; var display:CADisplayLink?; var last=0.0; var hudTime=0.0; var menu:UIView?
     let blue=UIColor(red:0.12,green:0.6,blue:0.93,alpha:1), red=UIColor(red:0.96,green:0.33,blue:0.25,alpha:1)
@@ -73,7 +73,7 @@ final class GameController: UIViewController {
         render.scene=scene; render.isPlaying=true; render.antialiasingMode = .multisampling4X; render.preferredFramesPerSecond=60
         scene.background.contents=UIColor(red:0.58,green:0.81,blue:0.93,alpha:1); scene.fogColor=UIColor(red:143/255,green:173/255,blue:170/255,alpha:1); scene.fogStartDistance=100; scene.fogEndDistance=270
         scene.rootNode.addChildNode(world); scene.rootNode.addChildNode(effects); scene.rootNode.addChildNode(camera); scene.rootNode.addChildNode(target)
-        camera.camera=SCNCamera(); camera.camera?.fieldOfView=68;camera.camera?.wantsHDR=true;camera.camera?.wantsExposureAdaptation=false;camera.camera?.saturation=1.15;camera.camera?.bloomIntensity=0; camera.camera?.zFar=600; render.pointOfView=camera
+        camera.camera=SCNCamera(); camera.camera?.fieldOfView=68;camera.camera?.wantsHDR=false; camera.camera?.zFar=600; render.pointOfView=camera
         let ambient=SCNNode(); ambient.light=SCNLight(); ambient.light?.type = .ambient; ambient.light?.intensity=650; scene.rootNode.addChildNode(ambient)
         let sun=SCNNode(); sun.light=SCNLight(); sun.light?.type = .directional; sun.light?.intensity=1100; sun.light?.castsShadow=true; sun.light?.shadowMapSize=CGSize(width:1024,height:1024); sun.eulerAngles=SCNVector3(-0.9,-0.6,0); scene.rootNode.addChildNode(sun)
         for label in [hud,notice] { label.textColor = .white; label.textAlignment = .center; label.font=UIFont.monospacedSystemFont(ofSize:16,weight:.bold); label.layer.shadowOpacity=0.8; label.layer.shadowRadius=2; view.addSubview(label) }
@@ -81,14 +81,15 @@ final class GameController: UIViewController {
         hud.isHidden=true
         view.addSubview(right)
         for control in [left,fire,skill,pause,jumpButton,switchButton,reloadButton] { view.addSubview(control) }
-        fire.fires=true;fire.backgroundColor=red.withAlphaComponent(0.6);fire.layer.cornerRadius=42;fire.layer.borderWidth=2;fire.layer.borderColor=UIColor.white.withAlphaComponent(0.6).cgColor
-        let fireText=UILabel(frame:fire.bounds);fireText.autoresizingMask=[.flexibleWidth,.flexibleHeight];fireText.text="FIRE\nDRAG TO AIM";fireText.numberOfLines=2;fireText.textAlignment = .center;fireText.textColor = .white;fireText.font=UIFont.boldSystemFont(ofSize:12);fire.addSubview(fireText)
+        fire.fires=true;fire.backgroundColor=UIColor.black.withAlphaComponent(0.12);fire.layer.cornerRadius=42;fire.layer.borderWidth=2;fire.layer.borderColor=UIColor.white.withAlphaComponent(0.6).cgColor
+        let fireText=UILabel(frame:fire.bounds);fireText.autoresizingMask=[.flexibleWidth,.flexibleHeight];fireText.text="FIRE";fireText.numberOfLines=2;fireText.textAlignment = .center;fireText.textColor = .white;fireText.font=UIFont.boldSystemFont(ofSize:12);fire.addSubview(fireText)
         style(skill,"ABILITY",blue);style(pause,"Ⅱ",UIColor.darkGray);style(jumpButton,"JUMP",UIColor.darkGray)
         style(switchButton,"SWAP",UIColor.darkGray);style(reloadButton,"RELOAD",UIColor.darkGray)
+        for button in [switchButton,skill] {button.backgroundColor = .clear;button.layer.borderWidth=0;button.layer.shadowOpacity=0;button.setTitle("",for:.normal)}
         switchButton.addAction(UIAction{[weak self] _ in self?.swapWeapon()},for:.touchUpInside)
         reloadButton.addAction(UIAction{[weak self] _ in guard let self=self,let g=self.game,!g.paused else{return};g.reload(g.heroes[0])},for:.touchUpInside)
         jumpButton.addAction(UIAction { [weak self] _ in self?.jumpRequested=true },for:.touchDown)
-        crosshair.text="＋";crosshair.textColor = .white;crosshair.font=UIFont.systemFont(ofSize:26,weight:.light);crosshair.textAlignment = .center;crosshair.isUserInteractionEnabled=false;view.addSubview(crosshair)
+        crosshair.text=nil;crosshair.textColor = .white;crosshair.font=UIFont.systemFont(ofSize:26,weight:.light);crosshair.textAlignment = .center;crosshair.isUserInteractionEnabled=false;view.addSubview(crosshair)
         skill.addTarget(self,action:#selector(useSkill),for:.touchUpInside); pause.addTarget(self,action:#selector(togglePause),for:.touchUpInside)
         display=CADisplayLink(target:self,selector:#selector(tick(_:))); display?.add(to:.main,forMode:.common)
         NotificationCenter.default.addObserver(self,selector:#selector(background),name:UIApplication.willResignActiveNotification,object:nil)
@@ -102,11 +103,11 @@ final class GameController: UIViewController {
     func style(_ b:UIButton,_ title:String,_ color:UIColor) { b.setTitle(title,for:.normal); b.setTitleColor(.white,for:.normal); b.titleLabel?.font=UIFont.boldSystemFont(ofSize:16); b.backgroundColor=color.withAlphaComponent(0.82); b.layer.cornerRadius=5;b.layer.borderWidth=2;b.layer.borderColor=UIColor(red:0.95,green:0.9,blue:0.65,alpha:1).cgColor;b.titleLabel?.font=UIFont.systemFont(ofSize:16,weight:.black);b.layer.shadowOpacity=0.6;b.layer.shadowOffset=CGSize(width:2,height:3);b.layer.shadowRadius=0 }
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews(); let r=view.safeAreaInsets; let w=view.bounds.width,h=view.bounds.height
-        left.frame.origin=CGPoint(x:r.left+25,y:h-r.bottom-141);right.frame=CGRect(x:w*0.38,y:0,width:w*0.62,height:h)
-        fire.frame=CGRect(x:w-r.right-106,y:h-r.bottom-117,width:88,height:88); skill.frame=CGRect(x:w-r.right-128,y:h-r.bottom-182,width:110,height:48)
-        switchButton.frame=CGRect(x:w-r.right-224,y:h-r.bottom-116,width:96,height:42);reloadButton.frame=CGRect(x:w-r.right-224,y:h-r.bottom-65,width:96,height:42)
+        left.frame.origin=CGPoint(x:r.left+25,y:h-r.bottom-166);right.frame=CGRect(x:w*0.38,y:0,width:w*0.62,height:h)
+        fire.frame=CGRect(x:w-r.right-106,y:h-r.bottom-150,width:88,height:88); let k=max(0.7,min(1,h/600));skill.frame=CGRect(x:w/2-150*k,y:h-r.bottom-65*k,width:80*k,height:50*k)
+        switchButton.frame=CGRect(x:w/2-250*k,y:h-r.bottom-65*k,width:100*k,height:50*k);reloadButton.frame=CGRect(x:w-r.right-224,y:h-r.bottom-110,width:96,height:42)
         pause.frame=CGRect(x:w-r.right-66,y:r.top+14,width:48,height:38)
-        jumpButton.frame=CGRect(x:r.left+155,y:h-r.bottom-82,width:76,height:58);crosshair.frame=CGRect(x:w/2-20,y:h/2-20,width:40,height:40)
+        jumpButton.frame=CGRect(x:r.left+155,y:h-r.bottom-150,width:76,height:50);crosshair.frame=CGRect(x:w/2-20,y:h/2-20,width:40,height:40)
         hud.frame=CGRect(x:r.left+80,y:r.top+14,width:w-r.left-r.right-160,height:48); notice.frame=CGRect(x:100,y:h*0.24,width:w-200,height:45)
         comicHUD.frame=view.bounds;scoreToast.frame=CGRect(x:w/2-165,y:h*0.32,width:330,height:50)
         menu?.frame=view.bounds;layoutHeroMenu()
@@ -127,6 +128,7 @@ final class GameController: UIViewController {
     func start() {
         menu?.removeFromSuperview(); menu=nil;menuActor=nil;menuHeroView=nil; firing=false; yaw = .pi/2; pitch=0.08; left.reset();right.reset();fire.reset();cameraReady=false;jumpRequested=false
         guard let original=originalWorld else { notice.text="Original assets could not be loaded. Rebuild the IPA."; showMenu(result:"ASSET LOAD FAILED"); return }
+        comicHUD.portrait.image=makeHeroPortrait()
         let g=Game(mode:selectedMode,hero:selectedClass,layout:original.layout,playerTeam:selectedTeam); game=g
         matchFaction=selectedTeam+1;matchKind=selectedClass;career=CareerStore.shared.load(matchFaction,matchKind);creditedXP=0;matchRewarded=false
         g.heroes[0].abilityRank=career.abilityRank
@@ -217,8 +219,8 @@ final class GameController: UIViewController {
             hudTime=0
             comicHUD.refresh(g,career)
             reloadButton.setTitle(player.reloadRemaining>0 ? String(format:"%.1fs",player.reloadRemaining) : "RELOAD",for:.normal)
-            switchButton.setTitle("WEAPON \(player.weaponSlot+1) ⇄",for:.normal)
-            skill.setTitle(player.ability>0 ? "\(Int(ceil(player.ability)))s" : "ABILITY",for:.normal)
+            switchButton.setTitle("",for:.normal)
+            skill.setTitle(player.ability>0 ? "\(Int(ceil(player.ability)))" : "",for:.normal)
             notice.text=player.alive ? (g.elapsed<8 ? "Hold and drag FIRE to aim + shoot • JUMP" : g.message) : g.mode == .elimination ? "Eliminated • watching your squad" : "Respawn in \(Int(ceil(max(0,player.respawn))))"
         }
         if let winner=g.winner {
@@ -455,66 +457,75 @@ final class ComicLabel:UILabel {
         textAlignment = .center;layer.shadowColor=UIColor.black.cgColor;layer.shadowOpacity=0.7;layer.shadowOffset=CGSize(width:1,height:2);layer.shadowRadius=0
     }
 }
-final class ComicBanner:UIView {
-    let title=ComicLabel()
-    var color=UIColor.systemBlue
-    init(color:UIColor){self.color=color;super.init(frame:.zero);backgroundColor = .clear;addSubview(title)}
-    required init?(coder:NSCoder){fatalError()}
-    override func draw(_ rect:CGRect){
-        let p=UIBezierPath();p.move(to:CGPoint(x:8,y:3));p.addLine(to:CGPoint(x:bounds.width-3,y:0));p.addLine(to:CGPoint(x:bounds.width-10,y:bounds.height-3));p.addLine(to:CGPoint(x:0,y:bounds.height));p.close()
-        UIColor.black.withAlphaComponent(0.65).setFill();p.fill()
-        p.apply(CGAffineTransform(translationX:0,y:-2));color.setFill();p.fill();UIColor.white.withAlphaComponent(0.75).setStroke();p.lineWidth=2;p.stroke()
-    }
-    override func layoutSubviews(){super.layoutSubviews();title.frame=bounds.insetBy(dx:8,dy:3);setNeedsDisplay()}
-}
+
 final class ComicHUD:UIView {
-    let royal=ComicBanner(color:UIColor(red:0.18,green:0.57,blue:0.97,alpha:1)),national=ComicBanner(color:UIColor(red:0.95,green:0.22,blue:0.14,alpha:1))
-    let health=ComicLabel(),ammo=ComicLabel(),timer=ComicLabel(),objectives=ComicLabel(),career=ComicLabel()
-    let healthIcon=UIImageView()
-    let healthBar=UIProgressView(progressViewStyle:.bar),xpBar=UIProgressView(progressViewStyle:.bar)
+    let royal=UIImageView(),national=UIImageView(),royalScore=ComicLabel(),nationalScore=ComicLabel(),royalMultiplier=ComicLabel(),nationalMultiplier=ComicLabel()
+    let portrait=UIImageView(),xpFrame=UIImageView(),xpFill=UIImageView(),level=ComicLabel()
+    let healthFill=UIImageView(),healthFrame=UIImageView(),health=ComicLabel(),ammoFill=UIImageView(),ammoFrame=UIImageView(),ammo=ComicLabel()
+    let mission=ComicLabel(),missionProgress=ComicLabel(),weaponIcons=(0..<10).map{_ in UIImageView()},slotNumbers=(0..<10).map{_ in ComicLabel()}
+    let xpMask=CAShapeLayer()
     override init(frame:CGRect){
         super.init(frame:frame);isUserInteractionEnabled=false
-        healthIcon.image=OriginalUIArt.icon(["healthicon","health_icon"]);healthIcon.contentMode = .scaleAspectFit
-        for v in [royal,national,health,ammo,timer,objectives,career,healthBar,xpBar,healthIcon]{addSubview(v)}
-        healthBar.trackTintColor=UIColor.black.withAlphaComponent(0.7);healthBar.progressTintColor=UIColor(red:0.48,green:0.85,blue:0.12,alpha:1)
-        xpBar.trackTintColor=UIColor.black.withAlphaComponent(0.65);xpBar.progressTintColor=UIColor(red:1,green:0.8,blue:0.12,alpha:1)
+        let views:[UIView]=[royal,national,royalScore,nationalScore,royalMultiplier,nationalMultiplier,portrait,xpFill,xpFrame,level,healthFill,healthFrame,health,ammoFill,ammoFrame,ammo,mission,missionProgress]
+        for v in views+weaponIcons+slotNumbers {addSubview(v)}
+        for image in [royal,national,portrait,xpFrame,xpFill,healthFill,healthFrame,ammoFill,ammoFrame]+weaponIcons {image.contentMode = .scaleAspectFit}
+        healthFill.image=OriginalUIArt.image("bars/westiconhealthfull.tga");healthFrame.image=OriginalUIArt.image("bars/westiconhealthframe.tga")
+        ammoFill.image=OriginalUIArt.image("bars/westiconammofull.tga");ammoFrame.image=OriginalUIArt.image("bars/westiconammoframe52.tga")
+        xpFrame.image=OriginalUIArt.image("xpbar/westxpbarframe.tga");xpFill.image=OriginalUIArt.image("xpbar/westxpbarfull.dds");xpFill.layer.mask=xpMask
+        portrait.layer.cornerRadius=30;portrait.clipsToBounds=true
     }
     required init?(coder:NSCoder){fatalError()}
     override func layoutSubviews(){
-        super.layoutSubviews();let w=bounds.width,h=bounds.height,s=safeAreaInsets,center=w/2
-        royal.frame=CGRect(x:center-182,y:s.top+10,width:148,height:49);national.frame=CGRect(x:center+34,y:s.top+10,width:148,height:49)
-        timer.frame=CGRect(x:center-35,y:s.top+10,width:70,height:38);objectives.frame=CGRect(x:center-130,y:s.top+60,width:260,height:32)
-        healthIcon.frame=CGRect(x:s.left+12,y:h-s.bottom-40,width:26,height:26)
-        health.frame=CGRect(x:s.left+10,y:h-s.bottom-44,width:145,height:30);healthBar.frame=CGRect(x:s.left+20,y:h-s.bottom-12,width:125,height:7)
-        ammo.frame=CGRect(x:w-s.right-170,y:h-s.bottom-32,width:155,height:27)
-        career.frame=CGRect(x:center-145,y:h-s.bottom-29,width:290,height:22);xpBar.frame=CGRect(x:center-145,y:h-s.bottom-7,width:290,height:5)
+        super.layoutSubviews();let w=bounds.width,h=bounds.height,s=safeAreaInsets,c=w/2,k=max(0.7,min(1,h/600))
+        national.frame=CGRect(x:c-105*k,y:s.top+12,width:84*k,height:54*k);royal.frame=CGRect(x:c+20*k,y:s.top+12,width:84*k,height:54*k)
+        nationalScore.frame=CGRect(x:c-168*k,y:s.top+15,width:60*k,height:44*k);royalScore.frame=CGRect(x:c+108*k,y:s.top+15,width:60*k,height:44*k)
+        nationalMultiplier.frame=CGRect(x:c-80*k,y:s.top+53*k,width:40*k,height:25*k);royalMultiplier.frame=CGRect(x:c+45*k,y:s.top+53*k,width:40*k,height:25*k)
+        portrait.frame=CGRect(x:s.left+27*k,y:s.top+20*k,width:77*k,height:82*k)
+        xpFill.frame=CGRect(x:s.left+8*k,y:s.top+10*k,width:118*k,height:118*k);xpFrame.frame=CGRect(x:s.left+7*k,y:s.top+7*k,width:120*k,height:151*k)
+        level.frame=CGRect(x:s.left+110*k,y:s.top+108*k,width:28*k,height:25*k)
+        healthFill.frame=CGRect(x:s.left+12,y:h-s.bottom-58*k,width:52*k,height:52*k);healthFrame.frame=healthFill.frame
+        health.frame=CGRect(x:s.left+66*k,y:h-s.bottom-39*k,width:72*k,height:34*k)
+        ammoFill.frame=CGRect(x:w-s.right-38*k,y:h-s.bottom-55*k,width:35*k,height:52*k);ammoFrame.frame=ammoFill.frame
+        ammo.frame=CGRect(x:w-s.right-113*k,y:h-s.bottom-39*k,width:70*k,height:34*k)
+        mission.frame=CGRect(x:w-s.right-245*k,y:h*0.43,width:230*k,height:24*k);missionProgress.frame=CGRect(x:w-s.right-245*k,y:h*0.43+24*k,width:230*k,height:42*k)
+        for i in 0..<10 {let x=c-250*k+CGFloat(i)*50*k;weaponIcons[i].frame=CGRect(x:x,y:h-s.bottom-56*k,width:48*k,height:30*k);slotNumbers[i].frame=CGRect(x:x,y:h-s.bottom-25*k,width:48*k,height:23*k)}
     }
     func refresh(_ game:Game,_ profile:HeroCareer){
-        let h=game.heroes[0]
+        let player=game.heroes[0],k=max(0.7,min(1,bounds.height/600)),animation=Int(game.elapsed*8)%20
+        royal.image=OriginalUIArt.image(String(format:"score/british/scoreboard_flag%02d.tga",animation));national.image=OriginalUIArt.image(String(format:"score/national/scoreboard_flag%02d.tga",animation))
         let a=game.mode == .conquest ? Int(max(0,game.tickets[0])) : game.mode == .elimination ? game.heroes.filter{$0.team==0 && $0.alive}.count : Int(game.score[0])
         let b=game.mode == .conquest ? Int(max(0,game.tickets[1])) : game.mode == .elimination ? game.heroes.filter{$0.team==1 && $0.alive}.count : Int(game.score[1])
-        royal.title.write("ROYAL  \(a)",size:23);national.title.write("\(b)  NATIONAL",size:23)
-        let time=max(0,300-Int(game.elapsed));timer.write(String(format:"%d:%02d",time/60,time%60),color:UIColor(red:1,green:0.91,blue:0.37,alpha:1),size:17)
-        if game.mode == .flags {objectives.write("⚑  CAPTURE THE FLAG  ⚑",color:.systemYellow,size:18)}
-        else {
-            let badges=NSMutableAttributedString(string:"")
-            for flag in game.objectives {
-                badges.append(NSAttributedString(string:" ◆ ",attributes:[.font:UIFont.systemFont(ofSize:25,weight:.black),.foregroundColor:flag.owner==0 ? UIColor.systemBlue : flag.owner==1 ? UIColor.systemRed : UIColor.white,.strokeColor:UIColor.black,.strokeWidth:-6]))
-            }
-            objectives.attributedText=badges;objectives.textAlignment = .center
+        royalScore.write(String(a),size:32*k);nationalScore.write(String(b),size:32*k)
+        let royalOwned=game.objectives.filter{$0.owner==0}.count,nationalOwned=game.objectives.filter{$0.owner==1}.count
+        royalMultiplier.write(royalOwned>nationalOwned ? "2x" : "1x",size:18*k);nationalMultiplier.write(nationalOwned>royalOwned ? "2x" : "1x",size:18*k)
+        health.write(String(Int(player.hp)),size:29*k);healthFill.alpha=player.alive ? 1 : 0.3
+        let count=player.weapon?.magazine==0 ? "∞" : player.ammunition.indices.contains(player.weaponSlot) ? String(player.ammunition[player.weaponSlot]) : "∞"
+        ammo.write(count,size:29*k);level.write(String(profile.level),size:17*k)
+        let center=CGPoint(x:xpFill.bounds.midX,y:xpFill.bounds.midY),radius=max(xpFill.bounds.width,xpFill.bounds.height)
+        let path=UIBezierPath();path.move(to:center);path.addArc(withCenter:center,radius:radius,startAngle:.pi/2,endAngle:.pi/2+CGFloat(profile.levelFraction)*2*CGFloat.pi,clockwise:true);path.close();xpMask.path=path.cgPath
+        mission.write("INFANTRY HUNTER",size:15*k);missionProgress.numberOfLines=2;missionProgress.write("Eliminate enemies: \(min(10,profile.kills+player.kills))/10\nIn a round",color:UIColor(red:0.95,green:0.95,blue:0.22,alpha:1),size:14*k)
+        for i in 0..<10 {
+            slotNumbers[i].write(String((i+1)%10),size:15*k)
+            if player.equipped.indices.contains(i){weaponIcons[i].image=OriginalUIArt.image("weapons/weapon\(player.equipped[i].id).tga");weaponIcons[i].alpha=i==player.weaponSlot ? 1 : 0.5}
+            else if i==2 {let id=player.kind == .soldier ? 2001 : player.kind == .heavy ? 2011 : 2016;weaponIcons[i].image=OriginalUIArt.image("abilities/ability\(id).tga");weaponIcons[i].alpha=player.ability>0 ? 0.45 : 1}
+            else {weaponIcons[i].image=nil}
         }
-        health.write("\(healthIcon.image==nil ? "+" : "")  \(Int(h.hp))",color:UIColor(red:0.65,green:1,blue:0.3,alpha:1),size:26);healthBar.progress=Float(h.hp/h.kind.hp)
-        let count=h.weapon?.magazine==0 ? "∞" : h.ammunition.indices.contains(h.weaponSlot) ? "\(h.ammunition[h.weaponSlot])" : "∞"
-        ammo.write("\(count)  /  \(h.weapon?.magazine ?? 0)",color:UIColor(red:1,green:0.91,blue:0.37,alpha:1),size:24)
-        career.write("LEVEL \(profile.level)   +\(h.matchXP) XP   \(profile.valor) VP",color:.white,size:12);xpBar.progress=Float(profile.levelFraction)
     }
 }
 struct OriginalUIEntry:Decodable {let name:String,file:String,width:Int,height:Int}
 enum OriginalUIArt {
+    static let folder=Bundle.main.resourceURL!.appendingPathComponent("Assets/UI")
+    static let entries:[OriginalUIEntry] = (try? JSONDecoder().decode([OriginalUIEntry].self,from:Data(contentsOf:folder.appendingPathComponent("manifest.json")))) ?? []
+    static let images=NSCache<NSString,UIImage>()
+    static func image(_ suffix:String)->UIImage? {
+        let suffix=suffix.lowercased()
+        if let image=images.object(forKey:suffix as NSString){return image}
+        guard let entry=entries.first(where:{$0.name.lowercased().hasSuffix(suffix)}),let image=UIImage(contentsOfFile:folder.appendingPathComponent(entry.file).path) else{return nil}
+        images.setObject(image,forKey:suffix as NSString);return image
+    }
     static func icon(_ tokens:[String])->UIImage? {
-        guard let folder=Bundle.main.resourceURL?.appendingPathComponent("Assets/UI"),let data=try? Data(contentsOf:folder.appendingPathComponent("manifest.json")),let entries=try? JSONDecoder().decode([OriginalUIEntry].self,from:data) else{return nil}
-        guard let entry=entries.first(where:{e in tokens.contains(where:{e.name.lowercased().contains($0)}) && e.width<=256 && e.height<=256 && e.width>=16 && e.height>=16}) else{return nil}
-        return UIImage(contentsOfFile:folder.appendingPathComponent(entry.file).path)
+        guard let entry=entries.first(where:{e in tokens.contains(where:{e.name.lowercased().contains($0)}) && e.width<=256 && e.height<=256}) else{return nil}
+        return image(entry.name)
     }
 }
 final class CareerStore {
@@ -540,9 +551,9 @@ extension GameController {
                 let point=render.projectPoint(SCNVector3(Float(hit.position.x),Float(hit.height),Float(hit.position.z)))
                 if point.z>0 && point.z<1 {
                     let label=ComicLabel(frame:CGRect(x:CGFloat(point.x)-50,y:CGFloat(point.y)-25,width:100,height:50))
-                    label.write("+\(hit.damage)",color:UIColor(red:1,green:0.88,blue:0.1,alpha:1),size:hit.killed ? 34 : 27)
+                    label.write("+\(hit.damage)",color:.white,size:hit.killed ? 30 : 25)
                     label.isUserInteractionEnabled=false;view.addSubview(label)
-                    label.transform=CGAffineTransform(rotationAngle:CGFloat.random(in:-0.12...0.12)).scaledBy(x:0.6,y:0.6)
+                    label.transform=CGAffineTransform(scaleX:0.85,y:0.85)
                     UIView.animate(withDuration:0.12,animations:{label.transform = .identity})
                     UIView.animate(withDuration:0.8,delay:0.12,options:.curveEaseOut,animations:{label.center.y-=70;label.alpha=0},completion:{_ in label.removeFromSuperview()})
                     sparks(at:SCNVector3(Float(hit.position.x),Float(hit.height)-0.7,Float(hit.position.z)),color:UIColor(red:1,green:0.74,blue:0.1,alpha:1))
@@ -551,13 +562,13 @@ extension GameController {
                 UIView.animate(withDuration:0.22,animations:{self.crosshair.transform=CGAffineTransform(scaleX:1.35,y:1.35)},completion:{_ in self.crosshair.transform = .identity;self.crosshair.textColor = .white})
             }
             if hit.victim==0 {
-                let wash=UIView(frame:view.bounds);wash.isUserInteractionEnabled=false;wash.backgroundColor=UIColor.red.withAlphaComponent(0.12);view.addSubview(wash)
+                let wash=UIImageView(image:OriginalUIArt.image("player/icons/hud/hitindicator.tga"));wash.frame=CGRect(x:view.bounds.midX-100,y:view.bounds.height*0.08,width:200,height:140);wash.contentMode = .scaleAspectFit;wash.isUserInteractionEnabled=false;view.addSubview(wash)
                 UIView.animate(withDuration:0.25,animations:{wash.alpha=0},completion:{_ in wash.removeFromSuperview()})
             }
         }
         for event in g.scoreFeedback where event.hero==0 {
             scoreToast.layer.removeAllAnimations();scoreToast.alpha=1
-            scoreToast.write("\(event.reason)  +\(event.amount)",color:UIColor(red:1,green:0.87,blue:0.12,alpha:1),size:22)
+            scoreToast.write("+\(event.amount)",color:.white,size:28)
             scoreToast.transform=CGAffineTransform(scaleX:1.2,y:1.2)
             UIView.animate(withDuration:0.2,animations:{self.scoreToast.transform = .identity})
             UIView.animate(withDuration:0.4,delay:1.1,options:[],animations:{self.scoreToast.alpha=0},completion:nil)
@@ -652,5 +663,31 @@ enum OriginalFont {
         }
         return names.first(where:{$0.lowercased().contains("heroes") || $0.lowercased().contains("black") || $0.lowercased().contains("bold")}) ?? names.first
     }()
-    static func heavy(_ size:CGFloat)->UIFont {fontName.flatMap{UIFont(name:$0,size:size)} ?? UIFont.systemFont(ofSize:size,weight:.black)}
+    static func heavy(_ size:CGFloat)->UIFont {fontName.flatMap{UIFont(name:$0,size:size)} ?? UIFont(name:"ArialRoundedMTBold",size:size) ?? UIFont.systemFont(ofSize:size,weight:.bold)}
+}
+
+extension GameController {
+    func makeHeroPortrait()->UIImage? {
+        guard let wardrobe=wardrobe,let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Characters"),let actor=try? AnimatedCharacter(selectedTeam==0 ? "royal" : "national",directory:directory) else{return nil}
+        guard (try? wardrobe.apply(wardrobe.load(selectedTeam+1,selectedClass),faction:selectedTeam+1,to:actor)) != nil else{return nil}
+        actor.update(0.05,position:.zero,moving:false,firing:false,ability:false,alive:true)
+        let scene=SCNScene();scene.background.contents=UIColor.clear;scene.rootNode.addChildNode(actor.node)
+        let camera=SCNNode();camera.camera=SCNCamera();camera.camera?.fieldOfView=34;camera.position=SCNVector3(0,1.9,1.5);camera.look(at:SCNVector3(0,1.85,0));scene.rootNode.addChildNode(camera)
+        let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=850;scene.rootNode.addChildNode(ambient)
+        let sun=SCNNode();sun.light=SCNLight();sun.light?.type = .directional;sun.light?.intensity=950;sun.eulerAngles=SCNVector3(-0.5,-0.6,0);scene.rootNode.addChildNode(sun)
+        let renderer=SCNRenderer(device:nil,options:nil);renderer.scene=scene;renderer.pointOfView=camera
+        return renderer.snapshot(atTime:0,with:CGSize(width:128,height:128),antialiasingMode:.multisampling4X)
+    }
+}
+
+final class OriginalCrosshair:UILabel {
+    override func draw(_ rect:CGRect) {
+        let center=CGPoint(x:bounds.midX,y:bounds.midY),radius:CGFloat=12
+        for width in [CGFloat(4),CGFloat(1.6)] {
+            let path=UIBezierPath()
+            for i in 0..<4 {let start=CGFloat(i)*CGFloat.pi/2+0.18;path.move(to:CGPoint(x:center.x+cos(start)*radius,y:center.y+sin(start)*radius));path.addArc(withCenter:center,radius:radius,startAngle:start,endAngle:start+1.15,clockwise:true)}
+            path.move(to:CGPoint(x:center.x-3,y:center.y+11));path.addLine(to:CGPoint(x:center.x,y:center.y+3));path.addLine(to:CGPoint(x:center.x+3,y:center.y+11))
+            (width>2 ? UIColor.black : textColor ?? UIColor.white).setStroke();path.lineWidth=width;path.stroke()
+        }
+    }
 }

@@ -166,7 +166,7 @@ def main():
     ui_assets=[]
     for name in sorted(menu.entries):
         if not name.endswith(('.png','.dds','.tga')) or '/images/items/' in name:continue
-        if not any(k in name.lower() for k in ['hud/','ingame/','currency','valor','battlefund','rank','button','score','health']):continue
+        if not (name.lower().startswith('external/flashmenu/images/') or any(k in name.lower() for k in ['hud/','ingame/','currency','valor','battlefund','rank','button','score','health'])):continue
         try:
             raw=menu.read(name);im=Image.open(io.BytesIO(raw)).convert('RGBA')
             if im.width>2048 or im.height>2048:continue
@@ -185,6 +185,8 @@ def main():
     (ui/'fonts.json').write_text(json.dumps(native_fonts))
     (ui/'manifest.json').write_text(json.dumps(ui_assets,separators=(',',':')))
     print('Recovered original HUD/menu artwork:',len(ui_assets),flush=True)
+    candidates=[e for e in ui_assets if 'flashmenu/' in e['name'] and any(k in e['name'] for k in ['background/','frame','panel','header','bar','tab']) and not any(k in e['name'] for k in ['workbench/','eor/','hotdeal','_br.','_de.','_es.','_fr.','_it.','_nl.','_pl.','_pt.','_ru.','_tr.'])]
+    print('ORIGINAL_MENU_SKIN='+json.dumps(candidates,separators=(',',':')),flush=True)
 
     for source,destination in [('External/FlashMenu/images/background/logo.png','logo.png'),('External/FlashMenu/images/background/bg_menu.png','menu.png')]:
         data=menu.read(source);record(menu,source,data);(ui/destination).write_bytes(data)
