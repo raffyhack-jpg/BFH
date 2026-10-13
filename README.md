@@ -13,7 +13,9 @@ permission; the MIT license covers original code only.
 - Original Royal/National base models: 2,406 vertices and 2,286 triangles per
   faction, with original 1024px uniform textures. Original weighted skeletons and idle/run/fire/death/jump clips; weapon-specific poses are imported during preparation.
 - Original heat map terrain, town buildings, trees, props and original object placements.
-- Original v1.105 clothing catalog, meshes, texture layers, item icons and localized names.\n- Hero preview, faction/class selection, clothing categories, skin/hair palettes and saved loadouts.\n- Selectable original weapon models, two weapon slots, magazine counts, reloads and weapon animation poses.
+- Original v1.105 clothing catalog, meshes, texture layers, item icons and localized names.
+- Hero preview, faction/class selection, clothing categories, skin/hair palettes and saved loadouts.
+- Selectable original weapon models, two weapon slots, magazine counts, reloads and weapon animation poses.
 - Original sky dome/sky texture, capture flags and flagpole geometry.
 - Original Flash menu logo and scenic backdrop, imported without redrawing.
 - Conquest: capture the map objectives, drain enemy tickets, respawn.
@@ -24,12 +26,18 @@ permission; the MIT license covers original code only.
 - Five minute match cap, results, pause/resume, health, score, kills/deaths.
 - Class abilities: squad heal, temporary shield, dash.
 - Bots select mode objectives, navigate using A*, check line of sight, strafe,
-  retreat, heal at base, use abilities, and shoot with imperfect accuracy.
+  retreat, heal at base, use abilities, and shoot with imperfect accuracy. Flag carriers
+  follow their return route during combat; retrieval squads split from escorts.
+  Melee bots close to striking distance and select weapons for their target range.
+  Movement uses a single speed budget per frame.
 
 ## Controls
 
-Left stick moves relative to camera. Drag the right side to look, or hold and drag\nFIRE to aim and shoot with one thumb. JUMP jumps; SWAP changes equipped weapon;\nRELOAD reloads the magazine. ABILITY activates the class skill. The follow camera\nkeeps world up fixed and pulls in before obstructing scenery. Combat uses horizontal hitscan with modest
-horizontal aim assistance. Pause opens Resume/New Match; backgrounding pauses.
+Left stick moves relative to camera. Drag the right side to look, or hold and drag
+FIRE to aim and shoot with one thumb. JUMP jumps; SWAP changes equipped weapon;
+RELOAD reloads the magazine. ABILITY activates the class skill. The follow camera
+keeps world up fixed and pulls in before obstructing scenery. Player shots follow the crosshair in 3D and intersect airborne character capsules,
+terrain and scenery; the shoulder camera converges on characters under the reticle. Pause opens Resume/New Match; backgrounding pauses.
 
 ## Build
 
@@ -58,12 +66,11 @@ The source archive is about 1.2 GB, so first preparation needs a network connect
 and disk space. On macOS the preparation script installs innoextract through
 Homebrew and uses a local Python virtual environment with NumPy and Pillow.
 
-The manual `publish-ipa.yml` workflow publishes the IPA as a private prerelease
-asset. Select Run workflow on main; download the IPA from Releases. Ordinary
-builds still attempt an Actions artifact upload, which can fail when account
-artifact storage is full. Such an upload failure does not demonstrate a build
-failure; consult the asset and compile steps. Publishing has contents-write
-permission only for its manually dispatched publishing job.
+Successful builds on main publish their verified unsigned IPA and asset previews
+as private prerelease assets. Download the newest build from Releases. This avoids
+Actions artifact storage limits. The manual `publish-ipa.yml` workflow is also
+available. Both publishing jobs use contents-write permission with checkout
+credential persistence disabled.
 
 ## Original assets
 

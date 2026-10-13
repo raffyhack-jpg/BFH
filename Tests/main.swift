@@ -103,3 +103,38 @@ marksman.cooldown=0
 aimingGame.shoot(marksman,aim:V2(x:0,z:1),bot:false,aimPoint:reticle)
 check(raised.hp==raised.kind.hp-40,"Shoulder camera parallax must not miss the selected target")
 print("Validated shoulder-camera crosshair convergence on characters")
+
+let tactics=Game(mode:.flags,hero:.soldier)
+let carrier=tactics.heroes[1]
+tactics.flags[1].carrier=carrier.id;carrier.hp=carrier.kind.hp*0.1
+check(tactics.objective(for:carrier)==tactics.flags[0].home,"Wounded carrier must prioritize returning the flag")
+carrier.hp=carrier.kind.hp
+let escort=tactics.heroes[2],thief=tactics.heroes[8]
+carrier.p=V2(x:10,z:0)
+tactics.flags[0].carrier=thief.id
+for h in tactics.heroes where h.team==0 && h.id != carrier.id { h.p=V2(x:Double(h.id)-10,z:14) }
+thief.p=V2(x:-15,z:14)
+let retrieval=tactics.heroes.filter{$0.team==0 && $0.id != 0 && $0.id != carrier.id && tactics.objective(for:$0)==thief.p}
+check(retrieval.count==3,"Only a three-bot retrieval squad should chase the stolen home flag")
+let remaining=tactics.heroes.filter { h in h.team==0 && h.id != 0 && h.id != carrier.id && !retrieval.contains(where:{$0.id==h.id}) }
+check(remaining.allSatisfy{tactics.objective(for:$0).distance(carrier.p)<6},"Remaining bots must protect their carrier")
+
+let pursuit=Game(mode:.flags,hero:.soldier)
+for h in pursuit.heroes { h.hp=0;h.respawn=10000 }
+let knifeBot=pursuit.heroes[1],opponent=pursuit.heroes[8]
+knifeBot.hp=knifeBot.kind.hp;opponent.hp=opponent.kind.hp
+knifeBot.p=V2(x:0,z:0);opponent.p=V2(x:0,z:4);opponent.think=1000;opponent.cooldown=1000
+knifeBot.equip([WeaponProfile(id:5,name:"Knife",damage:35,interval:0.5,range:2.8,magazine:0,reloadTime:0,isMelee:true)])
+knifeBot.think=1000;knifeBot.path=[]
+let before=knifeBot.p.distance(opponent.p)
+pursuit.update(0.05)
+check(knifeBot.p.distance(opponent.p)<before,"Knife bot must approach instead of backing away")
+check(knifeBot.p.distance(V2(x:0,z:0))<=knifeBot.kind.speed*0.05+0.0001,"Bot movement exceeded one speed budget")
+pursuit.flags[1].carrier=knifeBot.id
+knifeBot.path=[V2(x:-3,z:0)];let previous=knifeBot.p
+pursuit.update(0.05)
+check(knifeBot.p.x<previous.x,"Flag carrier must keep following the return route during combat")
+knifeBot.equip([WeaponProfile(id:5,name:"Knife",damage:35,interval:0.5,range:2.8,magazine:0,reloadTime:0,isMelee:true),WeaponProfile(id:6,name:"Rifle",damage:20,interval:0.4,range:40,magazine:8,reloadTime:2)])
+check(pursuit.preferredWeapon(knifeBot,distance:15)==1,"Bot must select its ranged weapon for a distant enemy")
+check(pursuit.preferredWeapon(knifeBot,distance:2)==0,"Bot must select its stronger melee weapon at close range")
+print("Validated flag return, split retrieval/escort squads, melee pursuit and bot movement budgets")

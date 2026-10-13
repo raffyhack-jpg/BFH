@@ -233,34 +233,40 @@ final class Game {
         }
         return []
     }
+    func flagCarrier(_ h:Hero)->Bool { mode == .flags && flags[1-h.team].carrier == h.id }
     func objective(for h: Hero) -> V2 {
+        // A carrier must return the flag even while wounded.
+        if flagCarrier(h) { return flags[h.team].home }
         if h.hp < h.kind.hp*0.25 { return bases[h.team] }
         switch mode {
         case .flags:
-            let enemy=1-h.team
-            if mapLayout != nil {
-                if flags[enemy].carrier==h.id { return flags[h.team].home }
-                if let carrier=flags[h.team].carrier { return heroes[carrier].p }
-                if flags[h.team].p.distance(flags[h.team].home)>1 { return flags[h.team].p }
-                if h.id%4==1 { return flags[h.team].home }
-                return flags[enemy].p
+            let home=flags[h.team],enemy=flags[1-h.team]
+            let squad=heroes.filter{$0.team==h.team && $0.alive && $0.id != 0 && $0.id != enemy.carrier}
+            if let thief=home.carrier {
+                // Keep a retrieval squad instead of abandoning our carrier with the whole team.
+                let interceptors=squad.sorted {
+                    let a=$0.p.distance(heroes[thief].p),b=$1.p.distance(heroes[thief].p)
+                    return a==b ? $0.id<$1.id : a<b
+                }.prefix(3)
+                if interceptors.contains(where:{$0.id==h.id}) { return heroes[thief].p }
+            } else if home.p.distance(home.home)>1 {
+                if squad.min(by:{$0.p.distance(home.p)<$1.p.distance(home.p)})?.id==h.id { return home.p }
             }
-            if flags[enemy].carrier == h.id {
-                // Take a side lane home rather than returning through the main firefight.
-                if (h.team == 0 && h.p.x>6) || (h.team == 1 && h.p.x < -6) {
-                    return V2(x:0,z:h.id%2 == 0 ? 14 : -14)
-                }
-                return flags[h.team].home
+            if let id=enemy.carrier {
+                let carrier=heroes[id],towardHome=(home.home-carrier.p).unit
+                let side=V2(x:towardHome.z,z:-towardHome.x)
+                // Soldiers stay within healing distance; escorts spread out to avoid blocking fire.
+                let offset=towardHome*2.5+side*(h.id%2==0 ? 2 : -2)
+                return nearestFree(carrier.p+offset)
             }
-            if let carrier=flags[h.team].carrier { return heroes[carrier].p }
-            if flags[h.team].p.distance(flags[h.team].home)>1 { return flags[h.team].p }
-            if let carrier=flags[enemy].carrier { return heroes[carrier].p + V2(x:0,z:Double(h.id%3)-1) }
-            if h.id%3 == 1 { return flags[h.team].home + V2(x:h.team == 0 ? 5 : -5,z:Double(h.id%4)-2) }
-            // Send raiders around cover while defenders protect the home flag.
-            if (h.team == 0 && h.p.x < -8) || (h.team == 1 && h.p.x>8) {
-                return V2(x:0,z:h.id%2 == 0 ? 14 : -14)
+            let defenders=squad.sorted {
+                let a=$0.kind == .heavy ? 0 : 1,b=$1.kind == .heavy ? 0 : 1
+                return a==b ? $0.id<$1.id : a<b
+            }.prefix(2)
+            if defenders.contains(where:{$0.id==h.id}) {
+                return nearestFree(home.home+(enemy.home-home.home).unit*4+V2(x:0,z:Double(h.id%3)-1))
             }
-            return flags[enemy].p
+            return enemy.p
         case .conquest, .rocket:
             let candidates=objectives.filter { $0.owner != h.team }
             if candidates.isEmpty { return objectives[h.id%objectives.count].p }
@@ -346,6 +352,17 @@ final class Game {
         }
         if h.weapon?.isMelee != true { shots.append(Shot(from:h.p,to:end,team:h.team,fromY:groundHeight(h.p)+h.elevation+1.2,toY:groundHeight(end)+1.2)) }
     }
+    func preferredWeapon(_ h:Hero,distance:Double)->Int? {
+        let usable=h.equipped.indices.filter {
+            let w=h.equipped[$0]
+            return w.range>=distance && (w.magazine==0 || h.ammunition[$0]>0) && ($0 != h.weaponSlot || h.reloadRemaining==0)
+        }
+        return usable.max {
+            let a=h.equipped[$0],b=h.equipped[$1]
+            let ad=a.damage/max(0.05,a.interval),bd=b.damage/max(0.05,b.interval)
+            return ad==bd ? $0>$1 : ad<bd
+        }
+    }
     func ability(_ h: Hero) {
         guard h.ability <= 0, h.alive else { return }
         h.ability=12
@@ -392,24 +409,35 @@ final class Game {
             if h.think<=0 {
                 h.think=0.55+rng.next()*0.3; h.target=objective(for:h); h.path=route(h.p,h.target)
             }
-            let detection=h.equipped.map(\.range).max() ?? h.weaponRange
+            let detection=max(10,h.equipped.map(\.range).max() ?? h.weaponRange)
             let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<detection && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
+            var movement=V2.zero
+            while let next=h.path.first,h.p.distance(next)<0.6 { h.path.removeFirst() }
+            if let next=h.path.first { movement=(next-h.p).unit }
             if let enemy=enemy {
                 let aim=enemy.p-h.p; h.facing=atan2(aim.x,aim.z)
-                if h.equipped.count>1 && (aim.length>h.weaponRange || h.reloadRemaining>0),let index=h.equipped.indices.first(where: { $0 != h.weaponSlot && h.equipped[$0].range>=aim.length && (h.equipped[$0].magazine==0 || h.ammunition[$0]>0) }) {
-                    h.weaponSlot=index;h.reloadRemaining=0;h.cooldown=0.2
+                if let index=preferredWeapon(h,distance:aim.length),index != h.weaponSlot {
+                    h.weaponSlot=index;h.reloadRemaining=0;h.cooldown=max(h.cooldown,0.2)
                 }
                 shoot(h,aim:aim,bot:true,aimPoint:shotObstacle == nil ? nil : V3(x:enemy.p.x,y:groundHeight(enemy.p)+enemy.elevation+1.1,z:enemy.p.z))
                 if h.hp<h.kind.hp*0.55 || (h.kind == .heavy && aim.length<9) { ability(h) }
-                // Retreat toward base at critical health, otherwise strafe between shots.
-                if h.hp<h.kind.hp*0.25 { move(h,bases[h.team]-h.p,dt) }
-                else if aim.length<5 { move(h,aim * -1,dt) }
-                else { move(h,V2(x:aim.z,z:-aim.x) * (h.id%2 == 0 ? 1 : -1),dt*0.35) }
+                if !flagCarrier(h) && h.hp>=h.kind.hp*0.25 {
+                    if h.weapon?.isMelee==true && aim.length<h.weaponRange+3 {
+                        movement=aim.length>h.weaponRange*0.7 ? aim.unit : .zero
+                    } else if aim.length<2.7 {
+                        movement=aim.unit * -1
+                    } else {
+                        let lateral=V2(x:aim.z,z:-aim.x).unit*(h.id%2==0 ? 0.2 : -0.2)
+                        movement=movement+lateral
+                    }
+                }
+            } else {
+                if movement.length>0 { h.facing=atan2(movement.x,movement.z) }
+                // Reload between fights, so bots do not reach the next objective with an empty gun.
+                if let weapon=h.weapon,weapon.magazine>0,h.ammunition[h.weaponSlot]<max(1,weapon.magazine/2) { reload(h) }
             }
-            if let next=h.path.first {
-                if h.p.distance(next)<0.6 { h.path.removeFirst() }
-                else { let d=next-h.p; if enemy == nil { h.facing=atan2(d.x,d.z) }; move(h,d,dt) }
-            }
+            // Use one movement budget per frame; combat must not add a second full-speed move.
+            if movement.length>0 { move(h,movement,dt) }
         }
         switch mode {
         case .conquest, .rocket:
