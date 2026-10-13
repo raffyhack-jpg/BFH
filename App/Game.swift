@@ -126,6 +126,7 @@ final class Hero {
     var weaponRange:Double { weapon?.range ?? kind.range }
     func equip(_ weapons:[WeaponProfile]) { equipped=weapons;ammunition=weapons.map{$0.magazine};weaponSlot=0;reloadRemaining=0 }
     var matchXP=0,captures=0,abilityRank=1
+    var enemyID:Int?,senseTime=0.0
     var recentShot=0.0
     var cooldown: Double = 0; var ability: Double = 0
     var raidWaypoint:V2?=nil,raidComplete=false,raidReadyAt:Double?=nil
@@ -189,7 +190,7 @@ final class Game {
         for i in 0..<16 {
             let team = i < 8 ? playerTeam : 1-playerTeam
             let kind = i == 0 ? hero : HeroClass.allCases[i%3]
-            let h=Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%8)-3.5)));h.think=Double(i%8)*0.09;heroes.append(h)
+            let h=Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%8)-3.5)));h.think=Double(i%8)*0.09;h.senseTime=Double(i%8)*0.015;heroes.append(h)
         }
     }
     func free(_ p: V2) -> Bool {
@@ -507,7 +508,12 @@ final class Game {
                 else {h.think=0.55+rng.next()*0.3;if needsPath {h.path=route(h.p,destination);pathBudget-=1};h.target=destination}
             }
             let detection=max(10,h.equipped.map(\.range).max() ?? h.weaponRange)
-            let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<detection && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
+            h.senseTime-=dt
+            if h.senseTime<=0 || (h.enemyID.map{!heroes[$0].alive} ?? false) {
+                h.enemyID=heroes.filter{$0.team != h.team && $0.alive && $0.p.distance(h.p)<detection && visible(h.p,$0.p)}.min{$0.p.distance(h.p)<$1.p.distance(h.p)}?.id
+                h.senseTime=0.14+Double(h.id%4)*0.01
+            }
+            let enemy=h.enemyID.flatMap{heroes[$0].alive && heroes[$0].p.distance(h.p)<detection ? heroes[$0] : nil}
             if h.kind == .soldier && heroes.contains(where: { $0.team==h.team && $0.alive && $0.hp<$0.kind.hp*0.65 && $0.p.distance(h.p)<6.5 }) { ability(h) }
             var movement=V2.zero
             while let next=h.path.first,h.p.distance(next)<0.6 { h.path.removeFirst() }
