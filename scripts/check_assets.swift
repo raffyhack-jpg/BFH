@@ -34,8 +34,9 @@ for base in mapGame.bases { precondition(mapGame.free(base),"Original spawn is b
 for objective in mapGame.objectives {
     precondition(mapGame.free(objective.p),"Original objective is blocked")
     for base in mapGame.bases {
+        let started=Date()
         let path=mapGame.route(base,objective.p)
-        print("Original map route: base \(base) -> objective \(objective.p), \(path.count) waypoints")
+        print("Original map route: base \(base) -> objective \(objective.p), \(path.count) waypoints, \(Date().timeIntervalSince(started)) seconds")
         precondition(!path.isEmpty,"Bots cannot reach an objective on original terrain")
     }
 }

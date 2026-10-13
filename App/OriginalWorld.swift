@@ -29,8 +29,8 @@ final class OriginalWorld {
         func index(_ triangles:[[Float]],into cells:inout [Int:[[Float]]]) {
             for t in triangles where t.count==9 {
                 let xs=[t[0],t[3],t[6]],zs=[t[2],t[5],t[8]]
-                for x in Int(floor((xs.min()!-0.5)/8))...Int(floor((xs.max()!+0.5)/8)) {
-                    for z in Int(floor((zs.min()!-0.5)/8))...Int(floor((zs.max()!+0.5)/8)) { cells[x*10000+z,default:[]].append(t) }
+                for x in Int(floor((xs.min()! - 0.5)/8))...Int(floor((xs.max()! + 0.5)/8)) {
+                    for z in Int(floor((zs.min()! - 0.5)/8))...Int(floor((zs.max()! + 0.5)/8)) { cells[x*10000+z,default:[]].append(t) }
                 }
             }
         }
@@ -63,15 +63,20 @@ final class OriginalWorld {
             for offset in [Float(0.3),Float(1.0),Float(1.65)] {
                 let level=feet+offset
                 if level<min(t[1],min(t[4],t[7])) || level>max(t[1],max(t[4],t[7])) { continue }
-                var points:[SIMD2<Float>]=[]
-                for (i,j) in [(0,3),(3,6),(6,0)] {
+                var first=SIMD2<Float>.zero,second=SIMD2<Float>.zero,count=0
+                for edge in 0..<3 {
+                    let i=edge*3,j=((edge+1)%3)*3
                     let dy=t[j+1]-t[i+1]
                     if abs(dy)<0.00001 { continue }
                     let f=(level-t[i+1])/dy
-                    if f>=0 && f<=1 { points.append(SIMD2(t[i]+(t[j]-t[i])*f,t[i+2]+(t[j+2]-t[i+2])*f)) }
+                    if f>=0 && f<=1 {
+                        let point=SIMD2(t[i]+(t[j]-t[i])*f,t[i+2]+(t[j+2]-t[i+2])*f)
+                        if count==0 { first=point } else if count==1 { second=point }
+                        count+=1
+                    }
                 }
-                if points.count<2 { continue }
-                let a=points[0],b=points[1],d=b-a,v=SIMD2(Float(p.x),Float(p.z))-a
+                if count<2 { continue }
+                let d=second-first,v=SIMD2(Float(p.x),Float(p.z))-first
                 let fraction=max(0,min(1,simd_dot(v,d)/max(0.00001,simd_dot(d,d))))
                 if simd_length(v-d*fraction)<0.42 { return false }
             }
