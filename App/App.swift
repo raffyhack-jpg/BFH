@@ -89,7 +89,7 @@ final class GameController: UIViewController {
         style(skill,"ABILITY",blue);style(pause,"Ⅱ",UIColor.darkGray);style(jumpButton,"JUMP",UIColor.darkGray)
         style(switchButton,"SWAP",UIColor.darkGray);style(reloadButton,"RELOAD",UIColor.darkGray)
         for button in [switchButton,skill] {button.backgroundColor = .clear;button.layer.borderWidth=0;button.layer.shadowOpacity=0;button.setTitle("",for:.normal)}
-        switchButton.addAction(UIAction{[weak self] _ in self?.swapWeapon()},for:.touchUpInside)
+        switchButton.addGestureRecognizer(UITapGestureRecognizer(target:self,action:#selector(selectEquipment(_:))))
         reloadButton.addAction(UIAction{[weak self] _ in guard let self=self,let g=self.game,!g.paused else{return};g.reload(g.heroes[0])},for:.touchUpInside)
         jumpButton.addAction(UIAction { [weak self] _ in self?.jumpRequested=true },for:.touchDown)
         crosshair.text=nil;crosshair.textColor = .white;crosshair.font=UIFont.systemFont(ofSize:26,weight:.light);crosshair.textAlignment = .center;crosshair.isUserInteractionEnabled=false;view.addSubview(crosshair)
@@ -114,7 +114,7 @@ final class GameController: UIViewController {
         fire.frame=CGRect(x:w-r.right-106,y:h-r.bottom-150,width:88,height:88); let k=max(0.85,min(1.1,h/390));skill.frame=CGRect(x:w/2+34*k,y:h-r.bottom-75*k,width:64*k,height:64*k)
         switchButton.frame=CGRect(x:w/2-100*k,y:h-r.bottom-75*k,width:132*k,height:64*k);reloadButton.frame=CGRect(x:w-r.right-224,y:h-r.bottom-110,width:96,height:42)
         pause.frame=CGRect(x:w-r.right-66,y:r.top+14,width:48,height:38)
-        jumpButton.frame=CGRect(x:w-r.right-100,y:h-r.bottom-224,width:88,height:60);crosshair.frame=CGRect(x:w/2-20,y:h/2-20,width:40,height:40)
+        jumpButton.frame=CGRect(x:w-r.right-214,y:h-r.bottom-178,width:88,height:60);crosshair.frame=CGRect(x:w/2-20,y:h/2-20,width:40,height:40)
         hud.frame=CGRect(x:r.left+80,y:r.top+14,width:w-r.left-r.right-160,height:48); notice.frame=CGRect(x:100,y:h*0.24,width:w-200,height:45)
         comicHUD.frame=view.bounds;scoreToast.frame=CGRect(x:w/2-165,y:h*0.32,width:330,height:50)
         menu?.frame=view.bounds
@@ -275,6 +275,7 @@ extension GameController {
         let range=weapon.weaponClass==5 ? 45.0 : weapon.weaponClass==3 ? 16 : weapon.weaponClass==2 ? 24 : 28
         return WeaponProfile(id:weapon.id,name:weapon.name,damage:damage,interval:60/max(60,weapon.rpm),range:range,magazine:max(1,weapon.magazine),reloadTime:max(0.1,weapon.reload))
     }
+    @objc func selectEquipment(_ tap:UITapGestureRecognizer){guard let g=game else{return};let slot=tap.location(in:switchButton).x<switchButton.bounds.width/2 ? 0 : 1;if slot != g.heroes[0].weaponSlot {swapWeapon()}}
     func swapWeapon() {
         guard let g=game,!g.paused,g.winner==nil,let actor=animators.first ?? nil,let original=originalWorld else{return}
         g.switchWeapon(g.heroes[0])
@@ -420,7 +421,7 @@ final class ComicHUD:UIView {
         health.frame=CGRect(x:s.left+66*k,y:h-s.bottom-39*k,width:72*k,height:34*k)
         ammoFill.frame=CGRect(x:w-s.right-38*k,y:h-s.bottom-55*k,width:35*k,height:52*k);ammoFrame.frame=ammoFill.frame
         ammo.frame=CGRect(x:w-s.right-113*k,y:h-s.bottom-39*k,width:70*k,height:34*k)
-        mission.frame=CGRect(x:w-s.right-245*k,y:h*0.43,width:230*k,height:24*k);missionProgress.frame=CGRect(x:w-s.right-245*k,y:h*0.43+24*k,width:230*k,height:42*k)
+        mission.frame=CGRect(x:w-s.right-245*k,y:h*0.32,width:230*k,height:24*k);missionProgress.frame=CGRect(x:w-s.right-245*k,y:h*0.32+24*k,width:230*k,height:42*k)
         let gear=max(0.85,min(1.1,h/390));for i in 0..<10 {let x=c-100*gear+CGFloat(i)*67*gear;weaponIcons[i].frame=CGRect(x:x,y:h-s.bottom-72*gear,width:64*gear,height:44*gear);slotNumbers[i].frame=CGRect(x:x,y:h-s.bottom-27*gear,width:64*gear,height:23*gear);weaponIcons[i].isHidden=i>=3;slotNumbers[i].isHidden=i>=3}
         roundState.frame=CGRect(x:w/2-200,y:s.top+66,width:400,height:44)
     }

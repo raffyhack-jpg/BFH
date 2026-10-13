@@ -568,7 +568,7 @@ final class Game {
             if mode == .conquest {
                 let a=objectives.filter { $0.owner == 0 }.count, b=objectives.filter { $0.owner == 1 }.count
                 if a>b { tickets[1]-=dt*Double(a-b)*0.12 }; if b>a { tickets[0]-=dt*Double(b-a)*0.12 }
-                if tickets[0]<=0 || tickets[1]<=0 {finish(tickets[0]<=0 && tickets[1]<=0 ? -1 : tickets[0]<=0 ? 1 : 0,reason:"Conquest • enemy tickets exhausted")}
+                if tickets[0]<=0 || tickets[1]<=0 {finish(tickets[0]<=0 && tickets[1]<=0 ? -1 : tickets[0]<=0 ? 1 : 0,reason:tickets[0]<=0 && tickets[1]<=0 ? "Conquest • both teams exhausted their tickets" : tickets[0]<=0 ? "Conquest • Royal tickets exhausted" : "Conquest • National tickets exhausted")}
             } else if objectives[0].owner>=0 {
                 let team=objectives[0].owner; score[team]+=dt
                 if score[team]>=60 {finish(team,reason:"Rocket Control • held the objective for 60 seconds")}
@@ -592,7 +592,7 @@ final class Game {
             }
         case .elimination:
             let blueAlive=heroes.contains{$0.team==0 && $0.alive},redAlive=heroes.contains{$0.team==1 && $0.alive}
-            if !blueAlive || !redAlive {finish(!blueAlive && !redAlive ? -1 : blueAlive ? 0 : 1,reason:"Elimination • opposing squad eliminated")}
+            if !blueAlive || !redAlive {finish(!blueAlive && !redAlive ? -1 : blueAlive ? 0 : 1,reason:!blueAlive && !redAlive ? "Elimination • both squads eliminated" : blueAlive ? "Elimination • National squad eliminated" : "Elimination • Royal squad eliminated")}
         }
         if elapsed>=roundDuration && winner == nil {
             let a=mode == .conquest ? tickets[0] : mode == .elimination ? Double(heroes.filter{$0.team == 0 && $0.alive}.count) : score[0]
