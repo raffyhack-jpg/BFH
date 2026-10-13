@@ -51,6 +51,7 @@ final class GameController: UIViewController {
     let render=SCNView(); let scene=SCNScene(); let camera=SCNNode(); let target=SCNNode()
     var skyNode:SCNNode?; var originalWorld:OriginalWorld?; var game:Game?; var selectedClass=HeroClass.soldier; var selectedMode=Mode.conquest
     var menuActor:AnimatedCharacter?,menuHeroView:SCNView?
+    var menuCenter:NSLayoutConstraint?,menuLogo:UIImageView?,menuSubtitle:UILabel?,menuResult:UILabel?,menuHeroTitle:ComicLabel?
     var wardrobe:OriginalWardrobe?;var selectedTeam=0;var playerLoadout=HeroLoadout()
     let switchButton=UIButton(type:.system),reloadButton=UIButton(type:.system)
     var animators:[AnimatedCharacter?]=[]; var previousPositions:[V2]=[]
@@ -108,7 +109,7 @@ final class GameController: UIViewController {
         jumpButton.frame=CGRect(x:r.left+155,y:h-r.bottom-82,width:76,height:58);crosshair.frame=CGRect(x:w/2-20,y:h/2-20,width:40,height:40)
         hud.frame=CGRect(x:r.left+80,y:r.top+14,width:w-r.left-r.right-160,height:48); notice.frame=CGRect(x:100,y:h*0.24,width:w-200,height:45)
         comicHUD.frame=view.bounds;scoreToast.frame=CGRect(x:w/2-165,y:h*0.32,width:330,height:50)
-        menu?.frame=view.bounds
+        menu?.frame=view.bounds;layoutHeroMenu()
     }
     func sphere(_ radius:CGFloat,_ color:UIColor) -> SCNNode { let g=SCNSphere(radius:radius); g.segmentCount=10; g.firstMaterial?.diffuse.contents=color; return SCNNode(geometry:g) }
     func soldier(_ kind:HeroClass,_ team:Int,loadout:HeroLoadout?=nil) throws -> SCNNode {
@@ -124,7 +125,7 @@ final class GameController: UIViewController {
         return root
     }
     func start() {
-        menu?.removeFromSuperview(); menu=nil; firing=false; yaw = .pi/2; pitch=0.08; left.reset();right.reset();fire.reset();cameraReady=false;jumpRequested=false
+        menu?.removeFromSuperview(); menu=nil;menuActor=nil;menuHeroView=nil; firing=false; yaw = .pi/2; pitch=0.08; left.reset();right.reset();fire.reset();cameraReady=false;jumpRequested=false
         guard let original=originalWorld else { notice.text="Original assets could not be loaded. Rebuild the IPA."; showMenu(result:"ASSET LOAD FAILED"); return }
         let g=Game(mode:selectedMode,hero:selectedClass,layout:original.layout,playerTeam:selectedTeam); game=g
         matchFaction=selectedTeam+1;matchKind=selectedClass;career=CareerStore.shared.load(matchFaction,matchKind);creditedXP=0;matchRewarded=false
@@ -237,6 +238,7 @@ final class GameController: UIViewController {
     }
     func showMenu(resume:Bool=false,result:String?=nil) {
         comicHUD.isHidden=true;scoreToast.isHidden=true
+        menuLogo=nil;menuSubtitle=nil;menuResult=nil;menuHeroTitle=nil
         menu?.removeFromSuperview(); let panel=UIView(frame:view.bounds); panel.backgroundColor=UIColor(red:0.05,green:0.10,blue:0.16,alpha:0.96); view.addSubview(panel); menu=panel
         right.reset();fire.reset();jumpRequested=false
         for c in [left,right,fire,skill,pause,jumpButton,crosshair,switchButton,reloadButton] { c.isHidden=true }
@@ -245,13 +247,14 @@ final class GameController: UIViewController {
             let shade=UIView(frame:panel.bounds);shade.autoresizingMask=[.flexibleWidth,.flexibleHeight];shade.backgroundColor=UIColor.black.withAlphaComponent(0.35);panel.addSubview(shade)
         }
         let stack=UIStackView(); stack.axis = .vertical; stack.spacing=8; stack.alignment = .fill; stack.translatesAutoresizingMaskIntoConstraints=false; panel.addSubview(stack)
-        NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo:panel.centerXAnchor,constant:panel.bounds.width*0.19),stack.centerYAnchor.constraint(equalTo:panel.centerYAnchor,constant:20),stack.widthAnchor.constraint(equalTo:panel.widthAnchor,multiplier:0.54)])
+        let center=stack.centerXAnchor.constraint(equalTo:panel.centerXAnchor,constant:panel.bounds.width*0.19);menuCenter=center
+        NSLayoutConstraint.activate([center,stack.centerYAnchor.constraint(equalTo:panel.centerYAnchor,constant:20),stack.widthAnchor.constraint(equalTo:panel.widthAnchor,multiplier:0.54)])
         if result == nil,let path=Bundle.main.path(forResource:"logo",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path) {
-            let logo=UIImageView(image:image);logo.contentMode = .scaleAspectFit;logo.frame=CGRect(x:view.safeAreaInsets.left+22,y:12,width:panel.bounds.width*0.32,height:60);panel.addSubview(logo)
+            let logo=UIImageView(image:image);logo.contentMode = .scaleAspectFit;menuLogo=logo;logo.frame=CGRect(x:view.safeAreaInsets.left+22,y:12,width:panel.bounds.width*0.32,height:60);panel.addSubview(logo)
         } else {
-            let title=UILabel();title.text=result ?? "BATTLEFIELD HEROES";title.textColor = .white;title.textAlignment = .center;title.font=UIFont.systemFont(ofSize:26,weight:.black);title.frame=CGRect(x:panel.bounds.width*0.43,y:14,width:panel.bounds.width*0.53,height:40);panel.addSubview(title)
+            let title=UILabel();title.text=result ?? "BATTLEFIELD HEROES";title.textColor = .white;title.textAlignment = .center;title.font=UIFont.systemFont(ofSize:26,weight:.black);menuResult=title;title.frame=CGRect(x:panel.bounds.width*0.43,y:14,width:panel.bounds.width*0.53,height:40);panel.addSubview(title)
         }
-        let subtitle=UILabel(); subtitle.text="ROYAL vs NATIONAL"; subtitle.textColor = .lightGray; subtitle.textAlignment = .center; subtitle.font=UIFont.systemFont(ofSize:13,weight:.semibold); subtitle.frame=CGRect(x:panel.bounds.width*0.45,y:52,width:panel.bounds.width*0.48,height:22);panel.addSubview(subtitle)
+        let subtitle=UILabel(); subtitle.text="ROYAL vs NATIONAL"; subtitle.textColor = .lightGray; subtitle.textAlignment = .center; subtitle.font=UIFont.systemFont(ofSize:13,weight:.semibold); menuSubtitle=subtitle;subtitle.frame=CGRect(x:panel.bounds.width*0.45,y:52,width:panel.bounds.width*0.48,height:22);panel.addSubview(subtitle)
         if resume {
             let button=UIButton(type:.system); style(button,"RESUME",blue); button.addAction(UIAction { [weak self] _ in self?.game?.paused=false;if let self=self {self.career=CareerStore.shared.load(self.matchFaction,self.matchKind);self.game?.heroes[0].abilityRank=self.career.abilityRank}; self?.menu?.removeFromSuperview(); self?.menu=nil; self?.comicHUD.isHidden=false;self?.scoreToast.isHidden=false; for c in [self?.left,self?.right,self?.fire,self?.skill,self?.pause,self?.jumpButton,self?.crosshair,self?.switchButton,self?.reloadButton] { c?.isHidden=false } },for:.touchUpInside); stack.addArrangedSubview(button); button.heightAnchor.constraint(equalToConstant:36).isActive=true
         }
@@ -267,7 +270,7 @@ final class GameController: UIViewController {
         profileButton.addAction(UIAction{[weak self] _ in self?.showCareer()},for:.touchUpInside);stack.addArrangedSubview(profileButton)
         let startButton=UIButton(type:.system); style(startButton,resume ? "NEW MATCH" : "DEPLOY",blue); startButton.addAction(UIAction { [weak self] _ in self?.start() },for:.touchUpInside); stack.addArrangedSubview(startButton); startButton.heightAnchor.constraint(equalToConstant:40).isActive=true
         let help=UILabel(); help.text="Soldier: heal squad  •  Gunner: shield  •  Commando: dash\nChoose your outfit and weapons in CUSTOMIZE HERO"; help.numberOfLines=2; help.textAlignment = .center; help.textColor = .lightGray; help.font=UIFont.systemFont(ofSize:11); stack.addArrangedSubview(help)
-        buildMenuHero(panel)
+        buildMenuHero(panel);layoutHeroMenu()
     }
 }
 
@@ -605,6 +608,16 @@ final class CareerController:UIViewController {
 }
 
 extension GameController {
+    func layoutHeroMenu() {
+        guard let panel=menu else{return}
+        let w=panel.bounds.width,h=panel.bounds.height
+        menuCenter?.constant=w*0.19
+        menuHeroView?.frame=CGRect(x:view.safeAreaInsets.left+5,y:75,width:w*0.39,height:max(100,h-100))
+        menuLogo?.frame=CGRect(x:view.safeAreaInsets.left+22,y:12,width:w*0.32,height:60)
+        menuResult?.frame=CGRect(x:w*0.43,y:14,width:w*0.53,height:40)
+        menuSubtitle?.frame=CGRect(x:w*0.45,y:52,width:w*0.48,height:22)
+        if let preview=menuHeroView {menuHeroTitle?.frame=CGRect(x:preview.frame.minX,y:h-36,width:preview.frame.width,height:30)}
+    }
     func buildMenuHero(_ panel:UIView) {
         menuActor=nil
         guard let wardrobe=wardrobe,let original=originalWorld,let directory=Bundle.main.resourceURL?.appendingPathComponent("Assets/Characters") else{return}
@@ -621,6 +634,7 @@ extension GameController {
             actor.node.eulerAngles.y = -0.22;scene.rootNode.addChildNode(actor.node);menuActor=actor
         } catch {return}
         let title=ComicLabel(frame:CGRect(x:preview.frame.minX,y:panel.bounds.height-36,width:preview.frame.width,height:30))
+        menuHeroTitle=title
         title.write("\(selectedTeam==0 ? "ROYAL" : "NATIONAL") \(selectedClass.rawValue.uppercased())",color:.systemYellow,size:19);panel.addSubview(title)
     }
 }
