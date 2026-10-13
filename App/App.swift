@@ -99,6 +99,9 @@ final class GameController: UIViewController {
         if let saved=UserDefaults.standard.string(forKey:"selected-class"),let kind=HeroClass(rawValue:saved) { selectedClass=kind }
         hud.numberOfLines=2;hud.font=UIFont.monospacedSystemFont(ofSize:12,weight:.bold)
         showMenu()
+        if ProcessInfo.processInfo.arguments.contains("--qa-gameplay"){DispatchQueue.main.asyncAfter(deadline:.now()+1){self.start()}}
+        if ProcessInfo.processInfo.arguments.contains("--qa-wardrobe"){DispatchQueue.main.asyncAfter(deadline:.now()+1){self.customizeHero(shop:true)}}
+        if ProcessInfo.processInfo.arguments.contains("--qa-abilities"){DispatchQueue.main.asyncAfter(deadline:.now()+1){self.showCareer()}}
     }
     func style(_ b:UIButton,_ title:String,_ color:UIColor) { b.setTitle(title,for:.normal); b.setTitleColor(.white,for:.normal); b.titleLabel?.font=UIFont.boldSystemFont(ofSize:16); b.backgroundColor=color.withAlphaComponent(0.82); b.layer.cornerRadius=5;b.layer.borderWidth=2;b.layer.borderColor=UIColor(red:0.95,green:0.9,blue:0.65,alpha:1).cgColor;b.titleLabel?.font=UIFont.systemFont(ofSize:16,weight:.black);b.layer.shadowOpacity=0.6;b.layer.shadowOffset=CGSize(width:2,height:3);b.layer.shadowRadius=0 }
     override func viewDidLayoutSubviews() {
@@ -240,40 +243,12 @@ final class GameController: UIViewController {
     }
     func showMenu(resume:Bool=false,result:String?=nil) {
         comicHUD.isHidden=true;scoreToast.isHidden=true
-        menuLogo=nil;menuSubtitle=nil;menuResult=nil;menuHeroTitle=nil
-        menu?.removeFromSuperview(); let panel=UIView(frame:view.bounds); panel.backgroundColor=UIColor(red:0.05,green:0.10,blue:0.16,alpha:0.96); view.addSubview(panel); menu=panel
+        menu?.removeFromSuperview();menuActor=nil;menuHeroView=nil;menuCenter=nil;menuLogo=nil;menuSubtitle=nil;menuResult=nil;menuHeroTitle=nil
         right.reset();fire.reset();jumpRequested=false
-        for c in [left,right,fire,skill,pause,jumpButton,crosshair,switchButton,reloadButton] { c.isHidden=true }
-        if let path=Bundle.main.path(forResource:"menu",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path) {
-            let background=UIImageView(image:image);background.frame=panel.bounds;background.autoresizingMask=[.flexibleWidth,.flexibleHeight];background.contentMode = .scaleAspectFill;background.clipsToBounds=true;background.layer.contentsRect=CGRect(x:0,y:0,width:1,height:656.0/1024.0);panel.addSubview(background)
-            let shade=UIView(frame:panel.bounds);shade.autoresizingMask=[.flexibleWidth,.flexibleHeight];shade.backgroundColor=UIColor.black.withAlphaComponent(0.35);panel.addSubview(shade)
-        }
-        let stack=UIStackView(); stack.axis = .vertical; stack.spacing=8; stack.alignment = .fill; stack.translatesAutoresizingMaskIntoConstraints=false; panel.addSubview(stack)
-        let center=stack.centerXAnchor.constraint(equalTo:panel.centerXAnchor,constant:panel.bounds.width*0.19);menuCenter=center
-        NSLayoutConstraint.activate([center,stack.centerYAnchor.constraint(equalTo:panel.centerYAnchor,constant:20),stack.widthAnchor.constraint(equalTo:panel.widthAnchor,multiplier:0.54)])
-        if result == nil,let path=Bundle.main.path(forResource:"logo",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path) {
-            let logo=UIImageView(image:image);logo.contentMode = .scaleAspectFit;menuLogo=logo;logo.frame=CGRect(x:view.safeAreaInsets.left+22,y:12,width:panel.bounds.width*0.32,height:60);panel.addSubview(logo)
-        } else {
-            let title=UILabel();title.text=result ?? "BATTLEFIELD HEROES";title.textColor = .white;title.textAlignment = .center;title.font=UIFont.systemFont(ofSize:26,weight:.black);menuResult=title;title.frame=CGRect(x:panel.bounds.width*0.43,y:14,width:panel.bounds.width*0.53,height:40);panel.addSubview(title)
-        }
-        let subtitle=UILabel(); subtitle.text="ROYAL vs NATIONAL"; subtitle.textColor = .lightGray; subtitle.textAlignment = .center; subtitle.font=UIFont.systemFont(ofSize:13,weight:.semibold); menuSubtitle=subtitle;subtitle.frame=CGRect(x:panel.bounds.width*0.45,y:52,width:panel.bounds.width*0.48,height:22);panel.addSubview(subtitle)
-        if resume {
-            let button=UIButton(type:.system); style(button,"RESUME",blue); button.addAction(UIAction { [weak self] _ in self?.game?.paused=false;if let self=self {self.career=CareerStore.shared.load(self.matchFaction,self.matchKind);self.game?.heroes[0].abilityRank=self.career.abilityRank}; self?.menu?.removeFromSuperview(); self?.menu=nil; self?.comicHUD.isHidden=false;self?.scoreToast.isHidden=false; for c in [self?.left,self?.right,self?.fire,self?.skill,self?.pause,self?.jumpButton,self?.crosshair,self?.switchButton,self?.reloadButton] { c?.isHidden=false } },for:.touchUpInside); stack.addArrangedSubview(button); button.heightAnchor.constraint(equalToConstant:36).isActive=true
-        }
-        let modes=UISegmentedControl(items:Mode.allCases.map{$0.rawValue}); modes.selectedSegmentIndex=Mode.allCases.firstIndex(of:selectedMode) ?? 0; modes.backgroundColor = .lightGray
-        modes.addAction(UIAction { [weak self, weak modes] _ in if let index=modes?.selectedSegmentIndex { self?.selectedMode=Mode.allCases[index] } },for:.valueChanged); stack.addArrangedSubview(modes)
-        let classes=UISegmentedControl(items:HeroClass.allCases.map{$0.rawValue}); classes.selectedSegmentIndex=HeroClass.allCases.firstIndex(of:selectedClass) ?? 0; classes.backgroundColor = .lightGray
-        classes.addAction(UIAction { [weak self, weak classes] _ in if let index=classes?.selectedSegmentIndex { self?.selectedClass=HeroClass.allCases[index];UserDefaults.standard.set(HeroClass.allCases[index].rawValue,forKey:"selected-class");self?.showMenu(resume:self?.game?.paused==true && self?.game?.winner==nil) } },for:.valueChanged); stack.addArrangedSubview(classes)
-        let customize=UIButton(type:.system);style(customize,"CUSTOMIZE HERO",UIColor(red:0.62,green:0.49,blue:0.17,alpha:1));customize.heightAnchor.constraint(equalToConstant:36).isActive=true
-        customize.addAction(UIAction{[weak self] _ in self?.customizeHero()},for:.touchUpInside);stack.addArrangedSubview(customize)
-        let profileButton=UIButton(type:.system);let profile=CareerStore.shared.load(selectedTeam+1,selectedClass)
-        style(profileButton,"LEVEL \(profile.level) • \(profile.valor) VP • \(profile.funds) BF • CAREER",UIColor(red:0.27,green:0.42,blue:0.15,alpha:1))
-        profileButton.heightAnchor.constraint(equalToConstant:36).isActive=true
-        profileButton.addAction(UIAction{[weak self] _ in self?.showCareer()},for:.touchUpInside);stack.addArrangedSubview(profileButton)
-        let startButton=UIButton(type:.system); style(startButton,resume ? "NEW MATCH" : "DEPLOY",blue); startButton.addAction(UIAction { [weak self] _ in self?.start() },for:.touchUpInside); stack.addArrangedSubview(startButton); startButton.heightAnchor.constraint(equalToConstant:40).isActive=true
-        let help=UILabel(); help.text="Soldier: heal squad  •  Gunner: shield  •  Commando: dash\nChoose your outfit and weapons in CUSTOMIZE HERO"; help.numberOfLines=2; help.textAlignment = .center; help.textColor = .lightGray; help.font=UIFont.systemFont(ofSize:11); stack.addArrangedSubview(help)
-        buildMenuHero(panel);layoutHeroMenu()
+        for c in [left,right,fire,skill,pause,jumpButton,crosshair,switchButton,reloadButton] {c.isHidden=true}
+        let panel=OriginalMenuShell(owner:self,resume:resume,result:result);view.addSubview(panel);menu=panel
     }
+
 }
 
 extension GameController {
@@ -292,9 +267,10 @@ extension GameController {
         actor.weaponPose=item.pose ?? "smg"
         actor.bones[44].childNodes.filter{$0.name=="held-weapon"}.forEach{$0.removeFromParentNode()};node.name="held-weapon";actor.bones[44].addChildNode(node)
     }
-    func customizeHero() {
+    func customizeHero(category:Int=4,shop:Bool=false) {
         guard let wardrobe=wardrobe,let original=originalWorld else { notice.text="Wardrobe assets could not be loaded";return }
         let screen=WardrobeController(wardrobe:wardrobe,original:original,faction:selectedTeam+1,kind:selectedClass)
+        screen.category=category;screen.shopMode=shop
         screen.finished={ [weak self] faction,kind in
             self?.selectedTeam=faction-1;self?.selectedClass=kind;UserDefaults.standard.set(faction-1,forKey:"selected-faction");UserDefaults.standard.set(kind.rawValue,forKey:"selected-class");self?.showMenu(resume:self?.game?.paused==true && self?.game?.winner==nil)
         }
@@ -302,28 +278,31 @@ extension GameController {
     }
 }
 final class ItemCard:UICollectionViewCell {
-    let image=UIImageView(),caption=UILabel(),check=UILabel(),price=UILabel()
+    let image=UIImageView(),caption=UILabel(),check=UILabel(),price=UILabel(),frameArt=UIImageView()
     override init(frame:CGRect) {
-        super.init(frame:frame);contentView.backgroundColor=UIColor(red:0.16,green:0.2,blue:0.19,alpha:0.95);contentView.layer.cornerRadius=7;contentView.layer.borderWidth=2
+        super.init(frame:frame);contentView.backgroundColor = .clear;contentView.layer.cornerRadius=7;contentView.layer.borderWidth=2
+        frameArt.image=OriginalUIArt.image("panels/01_fgslot.png")?.resizableImage(withCapInsets:UIEdgeInsets(top:8,left:8,bottom:8,right:8));contentView.addSubview(frameArt)
         image.contentMode = .scaleAspectFit;contentView.addSubview(image)
-        caption.numberOfLines=2;caption.font=UIFont.boldSystemFont(ofSize:11);caption.textColor = .white;caption.textAlignment = .center;contentView.addSubview(caption)
-        price.font=UIFont.systemFont(ofSize:11,weight:.black);price.textColor = .systemYellow;price.textAlignment = .center;contentView.addSubview(price)
+        caption.numberOfLines=2;caption.font=OriginalFont.heavy(11);caption.textColor = UIColor(white:0.15,alpha:1);caption.textAlignment = .center;contentView.addSubview(caption)
+        price.font=UIFont.systemFont(ofSize:11,weight:.black);price.textColor = UIColor(red:0.37,green:0.14,blue:0.06,alpha:1);price.textAlignment = .center;contentView.addSubview(price)
         check.text="✓";check.font=UIFont.boldSystemFont(ofSize:20);check.textColor = .yellow;contentView.addSubview(check)
     }
     required init?(coder:NSCoder){fatalError()}
-    override func layoutSubviews() { super.layoutSubviews();image.frame=CGRect(x:8,y:5,width:bounds.width-16,height:bounds.height-49);caption.frame=CGRect(x:3,y:bounds.height-47,width:bounds.width-6,height:28);check.frame=CGRect(x:bounds.width-27,y:3,width:24,height:24);price.frame=CGRect(x:3,y:bounds.height-18,width:bounds.width-6,height:16) }
+    override func layoutSubviews() { super.layoutSubviews();frameArt.frame=contentView.bounds;image.frame=CGRect(x:8,y:5,width:bounds.width-16,height:bounds.height-49);caption.frame=CGRect(x:3,y:bounds.height-47,width:bounds.width-6,height:28);check.frame=CGRect(x:bounds.width-27,y:3,width:24,height:24);price.frame=CGRect(x:3,y:bounds.height-18,width:bounds.width-6,height:16) }
 }
 final class WardrobeController:UIViewController,UICollectionViewDataSource,UICollectionViewDelegate,UISearchBarDelegate {
     let wardrobe:OriginalWardrobe,original:OriginalWorld
     var faction:Int,kind:HeroClass,loadout:HeroLoadout
     var profile:HeroCareer {CareerStore.shared.load(faction,kind)}
     var finished:((Int,HeroClass)->Void)?
-    let preview=SCNView(),previewScene=SCNScene(),previewCamera=SCNNode(),heroRoot=SCNNode()
+    let chrome=OriginalInventoryChrome(),preview=SCNView(),previewScene=SCNScene(),previewCamera=SCNNode(),heroRoot=SCNNode()
+    var heroSelectors:[UIButton]=[]
     var actor:AnimatedCharacter?,clock=0.0,last=0.0,link:CADisplayLink?,rotation:Float=0
     let heroTitle=UILabel(),factions=UISegmentedControl(items:["ROYAL","NATIONAL"]),classes=UISegmentedControl(items:["COMMANDO","SOLDIER","GUNNER"])
     let categoryScroll=UIScrollView(),categoryStack=UIStackView(),search=UISearchBar(),status=UILabel(),close=UIButton(type:.system),reset=UIButton(type:.system)
     let slots=UISegmentedControl(items:["WEAPON 1","WEAPON 2"])
     let collection:UICollectionView
+    var shopMode=false
     var category=4,query="",visibleItems:[ClothingItem]=[],visibleWeapons:[WardrobeWeapon]=[],visibleColors:[WardrobeColor]=[]
     let categories=["HATS","FACE","NECK","SHIRTS","JACKETS","WAIST","TROUSERS","SHOES","CHEST","SKIN","HAIR","WEAPONS"]
     init(wardrobe:OriginalWardrobe,original:OriginalWorld,faction:Int,kind:HeroClass) {
@@ -335,59 +314,59 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
     override var prefersStatusBarHidden:Bool {true}
     override var supportedInterfaceOrientations:UIInterfaceOrientationMask {.landscape}
     override func viewDidLoad() {
-        super.viewDidLoad();view.backgroundColor=UIColor(red:0.07,green:0.12,blue:0.12,alpha:1)
-        if let path=Bundle.main.path(forResource:"menu",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path) {
-            let background=UIImageView(image:image);background.frame=view.bounds;background.autoresizingMask=[.flexibleWidth,.flexibleHeight];background.contentMode = .scaleAspectFill;background.layer.contentsRect=CGRect(x:0,y:0,width:1,height:656.0/1024);view.addSubview(background)
-            let shade=UIView(frame:view.bounds);shade.backgroundColor=UIColor.black.withAlphaComponent(0.65);shade.autoresizingMask=[.flexibleWidth,.flexibleHeight];view.addSubview(shade)
-        }
-        heroTitle.text="MY HERO • SHOP";heroTitle.textColor = .white;heroTitle.font=UIFont.systemFont(ofSize:23,weight:.black)
-        for v in [preview,heroTitle,factions,classes,categoryScroll,collection,search,status,close,reset,slots] {view.addSubview(v)}
-        preview.scene=previewScene;preview.backgroundColor = .clear;preview.antialiasingMode = .multisampling4X;preview.isPlaying=true;preview.pointOfView=previewCamera
+        super.viewDidLoad();view.backgroundColor = .black;view.addSubview(chrome)
+        chrome.title=shopMode ? "Store" : "My Stuff";chrome.section=category==11 ? "Weapons" : "Appearance"
+        chrome.onBack={ [weak self] in guard let self=self else{return};self.save();self.finished?(self.faction,self.kind);self.dismiss(animated:false) }
+        chrome.onSection={ [weak self] index in guard let self=self else{return};if index==0 || index==1 {self.category=index==0 ? 4 : 11;self.refreshList();self.view.setNeedsLayout()} }
+        for v in [preview,heroTitle,categoryScroll,collection,search,status,reset,slots] {chrome.canvas.addSubview(v)}
+        heroTitle.text="Select hero";heroTitle.textColor=UIColor(white:0.15,alpha:1);heroTitle.font=OriginalFont.heavy(15);heroTitle.textAlignment = .center
+        factions.isHidden=true;classes.isHidden=true;close.isHidden=true
+        for (i,name) in ["Royal","National","Commando","Soldier","Gunner"].enumerated(){let b=chrome.button(name,size:12);b.addAction(UIAction{[weak self] _ in guard let self=self else{return};if i<2 {self.changeHero(faction:i+1,kind:self.kind)}else{self.changeHero(faction:self.faction,kind:[HeroClass.scout,.soldier,.heavy][i-2])};self.factions.selectedSegmentIndex=self.faction-1;self.classes.selectedSegmentIndex=self.kind.kit},for:.touchUpInside);chrome.canvas.addSubview(b);heroSelectors.append(b)}
+        preview.scene=previewScene;preview.backgroundColor = .clear;preview.isOpaque=false;previewScene.background.contents=UIColor.clear;preview.antialiasingMode = .multisampling4X;preview.isPlaying=true;preview.pointOfView=previewCamera
         previewScene.rootNode.addChildNode(heroRoot);previewCamera.camera=SCNCamera();previewCamera.camera?.fieldOfView=36;previewCamera.position=SCNVector3(0,1.2,4.7);previewCamera.look(at:SCNVector3(0,1.1,0));previewScene.rootNode.addChildNode(previewCamera)
         let ambient=SCNNode();ambient.light=SCNLight();ambient.light?.type = .ambient;ambient.light?.intensity=900;previewScene.rootNode.addChildNode(ambient)
         let light=SCNNode();light.light=SCNLight();light.light?.type = .directional;light.light?.intensity=1100;light.eulerAngles=SCNVector3(-0.5,-0.4,0);previewScene.rootNode.addChildNode(light)
         let pan=UIPanGestureRecognizer(target:self,action:#selector(turn(_:)));preview.addGestureRecognizer(pan)
         factions.selectedSegmentIndex=faction-1;classes.selectedSegmentIndex=kind.kit
-        for segmented in [factions,classes,slots] {segmented.backgroundColor=UIColor.white.withAlphaComponent(0.75);segmented.selectedSegmentTintColor=UIColor(red:0.7,green:0.57,blue:0.24,alpha:1)}
+        for segmented in [factions,classes,slots] {segmented.backgroundColor=UIColor.white.withAlphaComponent(0.75);segmented.selectedSegmentTintColor=UIColor(red:0.43,green:0.47,blue:0.17,alpha:1);segmented.setTitleTextAttributes([.font:OriginalFont.heavy(10)],for:.normal)}
         factions.addAction(UIAction{[weak self] _ in guard let self=self else{return};self.changeHero(faction:self.factions.selectedSegmentIndex+1,kind:self.kind)},for:.valueChanged)
         classes.addAction(UIAction{[weak self] _ in guard let self=self else{return};let kinds:[HeroClass]=[.scout,.soldier,.heavy];self.changeHero(faction:self.faction,kind:kinds[self.classes.selectedSegmentIndex])},for:.valueChanged)
         slots.selectedSegmentIndex=0;slots.addAction(UIAction{[weak self] _ in self?.refreshList();self?.refreshHero()},for:.valueChanged)
         categoryStack.axis = .horizontal;categoryStack.spacing=5;categoryScroll.addSubview(categoryStack);categoryScroll.showsHorizontalScrollIndicator=false
         for (i,name) in categories.enumerated() {
-            let button=UIButton(type:.system);button.tag=i;button.setTitle(name,for:.normal);button.titleLabel?.font=UIFont.boldSystemFont(ofSize:11);button.setTitleColor(.white,for:.normal);button.layer.cornerRadius=5;button.contentEdgeInsets=UIEdgeInsets(top:8,left:12,bottom:8,right:12)
+            let button=UIButton(type:.system);button.tag=i;button.setTitle(name,for:.normal);button.titleLabel?.font=OriginalFont.heavy(11);button.setTitleColor(.white,for:.normal);button.setBackgroundImage(OriginalUIArt.image("components/button.png")?.resizableImage(withCapInsets:UIEdgeInsets(top:7,left:8,bottom:7,right:8)),for:.normal);button.layer.cornerRadius=5;button.contentEdgeInsets=UIEdgeInsets(top:8,left:12,bottom:8,right:12)
             button.addAction(UIAction{[weak self] _ in self?.category=i;self?.refreshList()},for:.touchUpInside);categoryStack.addArrangedSubview(button)
         }
-        search.placeholder="Find an item";search.delegate=self;search.searchBarStyle = .minimal;search.searchTextField.textColor = .white
+        search.placeholder="Find an item";search.delegate=self;search.searchBarStyle = .minimal;search.searchTextField.textColor = .black;search.searchTextField.font=OriginalFont.heavy(12);search.searchTextField.backgroundColor=UIColor(white:0.95,alpha:0.6)
         collection.backgroundColor = .clear;collection.dataSource=self;collection.delegate=self;collection.register(ItemCard.self,forCellWithReuseIdentifier:"item")
-        status.numberOfLines=2;status.font=UIFont.systemFont(ofSize:12,weight:.semibold);status.textColor = .white;status.textAlignment = .center
+        status.numberOfLines=2;status.font=OriginalFont.heavy(12);status.textColor = UIColor(white:0.15,alpha:1);status.textAlignment = .center
         close.setTitle("SAVE & BACK",for:.normal);close.setTitleColor(.white,for:.normal);close.titleLabel?.font=UIFont.boldSystemFont(ofSize:13);close.backgroundColor=UIColor(red:0.45,green:0.54,blue:0.19,alpha:1);close.layer.cornerRadius=7
         close.addAction(UIAction{[weak self] _ in guard let self=self else{return};self.save();self.finished?(self.faction,self.kind);self.dismiss(animated:true)},for:.touchUpInside)
-        reset.setTitle("RESET OUTFIT",for:.normal);reset.setTitleColor(.white,for:.normal);reset.titleLabel?.font=UIFont.boldSystemFont(ofSize:12)
+        reset.setTitle("RESET OUTFIT",for:.normal);reset.setTitleColor(.white,for:.normal);reset.titleLabel?.font=OriginalFont.heavy(12);reset.setBackgroundImage(OriginalUIArt.image("components/button.png")?.resizableImage(withCapInsets:UIEdgeInsets(top:7,left:8,bottom:7,right:8)),for:.normal)
         reset.addAction(UIAction{[weak self] _ in guard let self=self else{return};self.loadout=self.wardrobe.defaults(self.faction,self.kind);self.save();self.refreshHero();self.refreshList()},for:.touchUpInside)
         CareerStore.shared.seed(wardrobe.defaults(faction,kind),loadout,faction,kind)
         refreshList();refreshHero();link=CADisplayLink(target:self,selector:#selector(animate(_:)));link?.add(to:.main,forMode:.common)
     }
     override func viewDidDisappear(_ animated:Bool) {super.viewDidDisappear(animated);link?.invalidate();link=nil}
     override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews();let safe=view.safeAreaInsets,w=view.bounds.width-safe.left-safe.right,h=view.bounds.height-safe.top-safe.bottom,x=safe.left
-        heroTitle.frame=CGRect(x:x+18,y:safe.top+8,width:w*0.3,height:30);close.frame=CGRect(x:x+w-142,y:safe.top+6,width:130,height:34)
-        factions.frame=CGRect(x:x+14,y:safe.top+45,width:w*0.29,height:30);classes.frame=CGRect(x:x+w*0.34,y:safe.top+45,width:w*0.64,height:30)
-        preview.frame=CGRect(x:x,y:safe.top+82,width:w*0.33,height:h-128);status.frame=CGRect(x:x+8,y:safe.top+h-55,width:w*0.31-16,height:45)
-        let rightX=x+w*0.34,rightWidth=w*0.64
-        categoryScroll.frame=CGRect(x:rightX,y:safe.top+83,width:rightWidth,height:34);categoryStack.frame=CGRect(origin:.zero,size:categoryStack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize));categoryScroll.contentSize=categoryStack.bounds.size
-        search.frame=CGRect(x:rightX-8,y:safe.top+118,width:rightWidth*0.61,height:42);slots.frame=CGRect(x:rightX+rightWidth*0.61,y:safe.top+126,width:rightWidth*0.39,height:28)
-        collection.frame=CGRect(x:rightX,y:safe.top+163,width:rightWidth,height:h-205)
-        let layout=collection.collectionViewLayout as! UICollectionViewFlowLayout;let columns=max(3,Int(rightWidth/115));layout.itemSize=CGSize(width:(rightWidth-CGFloat(columns-1)*8)/CGFloat(columns),height:108)
-        reset.frame=CGRect(x:rightX,y:safe.top+h-36,width:rightWidth,height:28)
+        super.viewDidLayoutSubviews();chrome.frame=view.bounds;chrome.setNeedsLayout();chrome.layoutIfNeeded()
+        heroTitle.frame=CGRect(x:35,y:438,width:274,height:22);preview.frame=CGRect(x:26,y:187,width:293,height:246);status.frame=CGRect(x:24,y:552,width:295,height:37)
+        for (i,b) in heroSelectors.enumerated(){b.frame=i<2 ? CGRect(x:CGFloat(38+i*137),y:464,width:131,height:28) : CGRect(x:CGFloat(29+(i-2)*96),y:500,width:91,height:28);b.alpha=(i<2 ? i+1==faction : i-2==kind.kit) ? 1 : 0.6}
+        categoryScroll.frame=CGRect(x:344,y:223,width:420,height:34);categoryStack.frame=CGRect(origin:.zero,size:categoryStack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize));categoryScroll.contentSize=categoryStack.bounds.size
+        search.frame=CGRect(x:340,y:259,width:265,height:42);slots.frame=CGRect(x:612,y:269,width:150,height:24)
+        collection.frame=CGRect(x:348,y:306,width:411,height:226);let layout=collection.collectionViewLayout as! UICollectionViewFlowLayout;layout.itemSize=CGSize(width:CGFloat(411-24)/4,height:104)
+        reset.frame=CGRect(x:518,y:548,width:180,height:30)
+        chrome.heading.write(category==11 ? "Weapons" : "Appearance",size:18);chrome.refresh(profile,faction:faction,kind:kind);chrome.section=category==11 ? "Weapons" : "Appearance"
+
     }
     func save() {wardrobe.save(loadout,faction,kind)}
     func changeHero(faction:Int,kind:HeroClass) {save();self.faction=faction;self.kind=kind;loadout=wardrobe.load(faction,kind);CareerStore.shared.seed(wardrobe.defaults(faction,kind),loadout,faction,kind);refreshList();refreshHero()}
     func refreshList() {
-        visibleItems=wardrobe.catalog.items.filter{$0.faction==faction && $0.kits & kind.kitMask != 0 && $0.slot==category && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query))}.sorted{$0.id<$1.id}
-        visibleWeapons=wardrobe.catalog.weapons.filter{$0.faction==faction && $0.kits & kind.kitMask != 0 && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query))}.sorted{$0.id<$1.id}
+        visibleItems=wardrobe.catalog.items.filter{$0.faction==faction && $0.kits & kind.kitMask != 0 && $0.slot==category && (shopMode || profile.owned.contains($0.id)) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query))}.sorted{$0.id<$1.id}
+        visibleWeapons=wardrobe.catalog.weapons.filter{$0.faction==faction && $0.kits & kind.kitMask != 0 && (shopMode || profile.owned.contains($0.id)) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query))}.sorted{$0.id<$1.id}
         visibleColors=wardrobe.catalog.colors.filter{$0.kind==(category==9 ? "skin" : "hair")}
-        for view in categoryStack.arrangedSubviews {view.backgroundColor=view.tag==category ? UIColor(red:0.58,green:0.45,blue:0.14,alpha:1) : UIColor.white.withAlphaComponent(0.14)}
-        slots.isHidden=category != 11;collection.reloadData()
+        for view in categoryStack.arrangedSubviews {view.backgroundColor=view.tag==category ? UIColor(red:0.58,green:0.45,blue:0.14,alpha:1) : UIColor.clear}
+        slots.isHidden=category != 11;collection.reloadData();view.setNeedsLayout()
     }
     func refreshHero() {
         heroRoot.childNodes.forEach{$0.removeFromParentNode()}
@@ -410,7 +389,7 @@ final class WardrobeController:UIViewController,UICollectionViewDataSource,UICol
             let c=visibleColors[indexPath.item];cell.caption.text=c.name;cell.image.backgroundColor=UIColor(red:CGFloat(c.rgb[0])/255,green:CGFloat(c.rgb[1])/255,blue:CGFloat(c.rgb[2])/255,alpha:1);selected=(category==9 ? loadout.skin : loadout.hair)==c.id
         } else if indexPath.item==0 {cell.caption.text="UNEQUIP";selected=loadout.clothing[category]==nil}
         else {let item=visibleItems[indexPath.item-1];cell.caption.text=item.name;cell.price.text=shopLabel(id:item.id,level:item.minimumLevel,valor:item.valorPrice,funds:item.fundsPrice,fallback:250);if let file=item.icon,let image=wardrobe.image(file){cell.image.image=UIImage(cgImage:image)};selected=loadout.clothing[category]==item.id}
-        cell.check.isHidden = !selected;cell.contentView.layer.borderColor=(selected ? UIColor.yellow : UIColor.white.withAlphaComponent(0.25)).cgColor;return cell
+        cell.check.isHidden = !selected;cell.contentView.layer.borderColor=(selected ? UIColor.yellow : UIColor.clear).cgColor;return cell
     }
     func shopLabel(id:Int,level:Int?,valor:Int?,funds:Int?,fallback:Int)->String {
         if profile.owned.contains(id){return "OWNED"}
@@ -591,30 +570,41 @@ extension GameController {
 final class CareerController:UIViewController {
     let faction:Int,kind:HeroClass
     var done:(()->Void)?
-    let stack=UIStackView(),heading=ComicLabel(),details=ComicLabel(),progress=UIProgressView(progressViewStyle:.bar),upgrade=UIButton(type:.system),close=UIButton(type:.system),missions=UILabel()
+    let chrome=OriginalInventoryChrome(),preview=SCNView(),heading=ComicLabel(),details=ComicLabel(),progress=UIProgressView(progressViewStyle:.bar),upgrade=UIButton(type:.custom),missions=UILabel(),abilityIcon=UIImageView()
+    var actor:AnimatedCharacter?,link:CADisplayLink?,last=0.0
     init(faction:Int,kind:HeroClass){self.faction=faction;self.kind=kind;super.init(nibName:nil,bundle:nil)}
     required init?(coder:NSCoder){fatalError()}
     override var prefersStatusBarHidden:Bool{true}
     override var supportedInterfaceOrientations:UIInterfaceOrientationMask{.landscape}
     override func viewDidLoad(){
-        super.viewDidLoad();view.backgroundColor=UIColor(red:0.22,green:0.3,blue:0.13,alpha:1)
-        if let path=Bundle.main.path(forResource:"menu",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path){let bg=UIImageView(image:image);bg.frame=view.bounds;bg.autoresizingMask=[.flexibleWidth,.flexibleHeight];bg.contentMode = .scaleAspectFill;bg.alpha=0.25;view.addSubview(bg)}
-        stack.axis = .vertical;stack.spacing=12;stack.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(stack)
-        NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo:view.centerXAnchor),stack.centerYAnchor.constraint(equalTo:view.centerYAnchor),stack.widthAnchor.constraint(equalTo:view.safeAreaLayoutGuide.widthAnchor,multiplier:0.78)])
-        for v in [heading,details,progress,missions,upgrade,close]{stack.addArrangedSubview(v)}
-        heading.heightAnchor.constraint(equalToConstant:38).isActive=true;details.heightAnchor.constraint(equalToConstant:42).isActive=true
-        missions.textColor = .white;missions.font=UIFont.systemFont(ofSize:15,weight:.bold);missions.numberOfLines=4;missions.textAlignment = .center
-        progress.progressTintColor = .systemYellow;progress.trackTintColor=UIColor.black.withAlphaComponent(0.5)
-        for button in [upgrade,close]{button.setTitleColor(.white,for:.normal);button.titleLabel?.font=UIFont.systemFont(ofSize:17,weight:.black);button.backgroundColor=UIColor(red:0.55,green:0.44,blue:0.13,alpha:1);button.layer.borderWidth=2;button.layer.borderColor=UIColor.white.cgColor;button.heightAnchor.constraint(equalToConstant:40).isActive=true}
-        upgrade.addAction(UIAction{[weak self] _ in guard let self=self else{return};var p=CareerStore.shared.load(self.faction,self.kind);if p.upgradeAbility(){CareerStore.shared.save(p,self.faction,self.kind)};self.refresh()},for:.touchUpInside)
-        close.setTitle("BACK TO MY HERO",for:.normal);close.addAction(UIAction{[weak self] _ in self?.done?();self?.dismiss(animated:true)},for:.touchUpInside);refresh()
+        super.viewDidLoad();view.addSubview(chrome);chrome.title="My Stuff";chrome.section="Abilities";chrome.onBack={ [weak self] in self?.done?();self?.dismiss(animated:false) };chrome.heading.write("Abilities",size:18)
+        preview.backgroundColor = .clear;preview.isOpaque=false;preview.antialiasingMode = .multisampling4X;preview.isPlaying=true;preview.frame=CGRect(x:28,y:219,width:291,height:308);chrome.canvas.addSubview(preview);makeHero()
+        chrome.art("panels/01_fgbox.png",CGRect(x:350,y:251,width:409,height:97),stretch:true)
+        let red=UIView(frame:CGRect(x:426,y:256,width:327,height:25));red.backgroundColor=UIColor(red:0.5,green:0.16,blue:0.14,alpha:1);red.layer.cornerRadius=5;chrome.canvas.addSubview(red)
+        heading.frame=CGRect(x:428,y:257,width:325,height:24);details.frame=CGRect(x:428,y:286,width:318,height:19);progress.frame=CGRect(x:437,y:315,width:160,height:12);progress.progressTintColor=UIColor(red:0.2,green:0.5,blue:0.7,alpha:1);progress.trackTintColor = .lightGray
+        abilityIcon.image=OriginalUIArt.image("abilities/ability\(kind == .soldier ? 2001 : kind == .heavy ? 2011 : 2016).tga");abilityIcon.contentMode = .scaleAspectFit;abilityIcon.frame=CGRect(x:357,y:270,width:65,height:51)
+        upgrade.setBackgroundImage(OriginalUIArt.image("components/button.png")?.resizableImage(withCapInsets:UIEdgeInsets(top:7,left:8,bottom:7,right:8)),for:.normal);upgrade.setTitleColor(.white,for:.normal);upgrade.titleLabel?.font=OriginalFont.heavy(13);upgrade.frame=CGRect(x:610,y:302,width:136,height:30)
+        missions.frame=CGRect(x:355,y:376,width:398,height:153);missions.numberOfLines=7;missions.textColor=UIColor(white:0.15,alpha:1);missions.font=OriginalFont.heavy(15);missions.textAlignment = .left
+        let missionTitle=ComicLabel(frame:CGRect(x:352,y:350,width:403,height:24));missionTitle.backgroundColor=UIColor(red:0.5,green:0.16,blue:0.14,alpha:1);missionTitle.write("Offline Missions",size:16);chrome.canvas.addSubview(missionTitle)
+        for v in [heading,details,progress,abilityIcon,upgrade,missions]{chrome.canvas.addSubview(v)}
+        upgrade.addAction(UIAction{[weak self] _ in guard let self=self else{return};var p=CareerStore.shared.load(self.faction,self.kind);if p.upgradeAbility(){CareerStore.shared.save(p,self.faction,self.kind)};self.refresh()},for:.touchUpInside);refresh()
+        link=CADisplayLink(target:self,selector:#selector(animate(_:)));link?.add(to:.main,forMode:.common)
+    }
+    override func viewDidLayoutSubviews(){super.viewDidLayoutSubviews();chrome.frame=view.bounds}
+    override func viewDidDisappear(_ animated:Bool){super.viewDidDisappear(animated);link?.invalidate();link=nil}
+    @objc func animate(_ d:CADisplayLink){let dt=last==0 ? 0 : min(0.05,d.timestamp-last);last=d.timestamp;actor?.update(dt,position:.zero,moving:false,firing:false,ability:false,alive:true)}
+    func makeHero(){
+        guard let url=Bundle.main.resourceURL,let wardrobe=try? OriginalWardrobe(directory:url.appendingPathComponent("Assets/Wardrobe")),let world=try? OriginalWorld(directory:url.appendingPathComponent("Assets/OriginalWorld")),let actor=try? AnimatedCharacter(faction==1 ? "royal" : "national",directory:url.appendingPathComponent("Assets/Characters")) else{return}
+        let scene=SCNScene();scene.background.contents=UIColor.clear;preview.scene=scene;let camera=SCNNode();camera.camera=SCNCamera();camera.camera?.fieldOfView=32;camera.position=SCNVector3(0,1.2,4.4);camera.look(at:SCNVector3(0,1.05,0));scene.rootNode.addChildNode(camera);preview.pointOfView=camera
+        let light=SCNNode();light.light=SCNLight();light.light?.type = .ambient;light.light?.intensity=1000;scene.rootNode.addChildNode(light);let sun=SCNNode();sun.light=SCNLight();sun.light?.type = .directional;sun.light?.intensity=1000;sun.eulerAngles=SCNVector3(-0.5,-0.4,0);scene.rootNode.addChildNode(sun)
+        let outfit=wardrobe.load(faction,kind);try? wardrobe.apply(outfit,faction:faction,to:actor);if let id=outfit.weapons.first,let item=wardrobe.weapons[id],let gun=try? world.model(item.model){actor.bones[44].addChildNode(gun);actor.weaponPose=item.pose ?? "smg"};scene.rootNode.addChildNode(actor.node);self.actor=actor
     }
     func refresh(){
-        let p=CareerStore.shared.load(faction,kind)
-        heading.write("\(kind.rawValue.uppercased()) • LEVEL \(p.level)",color:.systemYellow,size:30)
-        details.write("\(p.xp) XP    \(p.valor) VP    \(p.funds) BATTLEFUNDS    \(p.heroPoints) HP",size:17);progress.progress=Float(p.levelFraction)
-        missions.text="MISSIONS\nFIRST BATTLE  \(min(1,p.matches))/1  •  100 VP\nINFANTRY HUNTER  \(min(10,p.kills))/10  •  150 VP\nFLAG HERO  \(min(3,p.captures))/3  •  200 VP"
-        upgrade.setTitle("UPGRADE ABILITY  \(p.abilityRank)/5  •  1 HERO POINT",for:.normal);upgrade.isEnabled=p.heroPoints>0 && p.abilityRank<5;upgrade.alpha=upgrade.isEnabled ? 1 : 0.45
+        let p=CareerStore.shared.load(faction,kind);chrome.refresh(p,faction:faction,kind:kind)
+        heading.write("\(kind == .soldier ? "Combat Medicine" : kind == .heavy ? "Hero's Shield" : "Stealth")    (\(p.abilityRank)/5)",size:14)
+        details.write("Cost: 1 Hero Point",size:13);progress.progress=Float(p.abilityRank)/5
+        missions.text="First Battle   \(min(1,p.matches))/1   •   100 VP\n\nInfantry Hunter   \(min(10,p.kills))/10   •   150 VP\n\nFlag Hero   \(min(3,p.captures))/3   •   200 VP"
+        upgrade.setTitle("Upgrade • 1 HP",for:.normal);upgrade.isEnabled=p.heroPoints>0 && p.abilityRank<5;upgrade.alpha=upgrade.isEnabled ? 1 : 0.45
     }
 }
 

@@ -63,13 +63,15 @@ jobs:
         run: bash scripts/check_animation.sh
       - name: Build and test
         run: bash scripts/build_unsigned.sh
-      - name: Publish verified IPA to private prerelease
+      - name: Capture native original-style menus and gameplay
+        run: bash scripts/check_interface.sh
+      - name: Publish verified IPA to prerelease
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="prototype-${GITHUB_SHA:0:12}"
-          files=(build/PocketFront-unsigned.ipa)
+          files=(build/PocketFront-unsigned.ipa build/original-menu-native.png build/original-wardrobe-native.png build/original-abilities-native.png build/original-gameplay-native.png)
           if [ -f build/original-map-preview.png ]; then files+=(build/original-map-preview.png); fi
           if [ -f build/original-wardrobe-preview.png ]; then files+=(build/original-wardrobe-preview.png); fi
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -77,5 +79,5 @@ jobs:
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --prerelease \
               --title "iPhone prototype ${GITHUB_SHA:0:12}" \
-              --notes "Verified unsigned ARM64 iPhone prototype. Original 1.105 map, clothing, icons and weapon models; animated hero customization, two weapon slots, jumping, fixed world-up camera and crosshair-directed 3D touch shooting. Requires device signing. Full original gameplay and UI fidelity remain unfinished."
+              --notes "Verified unsigned ARM64 iPhone prototype. Original 1.105 map, clothing, icons, menu parchment, panel frames, animated faction flags and weapon models. Reference-based Flash-style menu, inventory and HUD layout. Native simulator screenshots attached; animated hero customization, two weapon slots, jumping and crosshair-directed 3D touch shooting. Requires device signing. Full original gameplay and UI fidelity remain unfinished."
           fi
