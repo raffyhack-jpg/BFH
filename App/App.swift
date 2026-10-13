@@ -577,7 +577,7 @@ extension GameController {
 final class CareerController:UIViewController {
     let faction:Int,kind:HeroClass
     var done:(()->Void)?
-    let stack=UIStackView(),title=ComicLabel(),details=ComicLabel(),progress=UIProgressView(progressViewStyle:.bar),upgrade=UIButton(type:.system),close=UIButton(type:.system),missions=UILabel()
+    let stack=UIStackView(),heading=ComicLabel(),details=ComicLabel(),progress=UIProgressView(progressViewStyle:.bar),upgrade=UIButton(type:.system),close=UIButton(type:.system),missions=UILabel()
     init(faction:Int,kind:HeroClass){self.faction=faction;self.kind=kind;super.init(nibName:nil,bundle:nil)}
     required init?(coder:NSCoder){fatalError()}
     override var prefersStatusBarHidden:Bool{true}
@@ -587,8 +587,8 @@ final class CareerController:UIViewController {
         if let path=Bundle.main.path(forResource:"menu",ofType:"png",inDirectory:"Assets/UI"),let image=UIImage(contentsOfFile:path){let bg=UIImageView(image:image);bg.frame=view.bounds;bg.autoresizingMask=[.flexibleWidth,.flexibleHeight];bg.contentMode = .scaleAspectFill;bg.alpha=0.25;view.addSubview(bg)}
         stack.axis = .vertical;stack.spacing=12;stack.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(stack)
         NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo:view.centerXAnchor),stack.centerYAnchor.constraint(equalTo:view.centerYAnchor),stack.widthAnchor.constraint(equalTo:view.safeAreaLayoutGuide.widthAnchor,multiplier:0.78)])
-        for v in [title,details,progress,missions,upgrade,close]{stack.addArrangedSubview(v)}
-        title.heightAnchor.constraint(equalToConstant:38).isActive=true;details.heightAnchor.constraint(equalToConstant:42).isActive=true
+        for v in [heading,details,progress,missions,upgrade,close]{stack.addArrangedSubview(v)}
+        heading.heightAnchor.constraint(equalToConstant:38).isActive=true;details.heightAnchor.constraint(equalToConstant:42).isActive=true
         missions.textColor = .white;missions.font=UIFont.systemFont(ofSize:15,weight:.bold);missions.numberOfLines=4;missions.textAlignment = .center
         progress.progressTintColor = .systemYellow;progress.trackTintColor=UIColor.black.withAlphaComponent(0.5)
         for button in [upgrade,close]{button.setTitleColor(.white,for:.normal);button.titleLabel?.font=UIFont.systemFont(ofSize:17,weight:.black);button.backgroundColor=UIColor(red:0.55,green:0.44,blue:0.13,alpha:1);button.layer.borderWidth=2;button.layer.borderColor=UIColor.white.cgColor;button.heightAnchor.constraint(equalToConstant:40).isActive=true}
@@ -597,7 +597,7 @@ final class CareerController:UIViewController {
     }
     func refresh(){
         let p=CareerStore.shared.load(faction,kind)
-        title.write("\(kind.rawValue.uppercased()) • LEVEL \(p.level)",color:.systemYellow,size:30)
+        heading.write("\(kind.rawValue.uppercased()) • LEVEL \(p.level)",color:.systemYellow,size:30)
         details.write("\(p.xp) XP    \(p.valor) VP    \(p.funds) BATTLEFUNDS    \(p.heroPoints) HP",size:17);progress.progress=Float(p.levelFraction)
         missions.text="MISSIONS\nFIRST BATTLE  \(min(1,p.matches))/1  •  100 VP\nINFANTRY HUNTER  \(min(10,p.kills))/10  •  150 VP\nFLAG HERO  \(min(3,p.captures))/3  •  200 VP"
         upgrade.setTitle("UPGRADE ABILITY  \(p.abilityRank)/5  •  1 HERO POINT",for:.normal);upgrade.isEnabled=p.heroPoints>0 && p.abilityRank<5;upgrade.alpha=upgrade.isEnabled ? 1 : 0.45
