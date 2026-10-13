@@ -22,9 +22,12 @@ def main():
     def value(text,key):
         m=re.search(r'^\s*'+re.escape(key)+r'\s+([^\r\n]+)',text,re.I|re.M);return m[1].strip().strip('"') if m else None
     def mesh(name,kind):
-        raw=client.read(mesh_paths[name]);record(client,mesh_paths[name],raw);temp=out/'temp.skinnedmesh';temp.write_bytes(raw);model=BF2Mesh.load(str(temp));temp.unlink();lod=model.geoms[0].lods[0];parts=[]
+        raw=client.read(mesh_paths[name]);record(client,mesh_paths[name],raw);temp=out/'temp.skinnedmesh';temp.write_bytes(raw);model=BF2Mesh.load(str(temp));temp.unlink()
+        candidates=[g.lods[0] for g in model.geoms if g.lods and any(r.bones for r in g.lods[0].rigs)]
+        if not candidates:raise ValueError('No weighted render geometry: '+name)
+        lod=max(candidates,key=lambda l:sum(len(m.vertices) for m,r in zip(l.materials,l.rigs) if r.bones));parts=[]
         for mat,rig in zip(lod.materials,lod.rigs):
-            if not mat.vertices or not mat.faces:continue
+            if not mat.vertices or not mat.faces or not rig.bones:continue
             part={'positions':[],'normals':[],'uv':[],'weights':[],'indices':[],'faces':[],'boneIDs':[b.id for b in rig.bones],'inverseBind':[],'materialType':kind}
             for v in mat.vertices:
                 p=v.position;n=v.normal;uv=v.texcoord0;w=v.blendweight[0] if v.blendweight else 1
@@ -49,7 +52,10 @@ def main():
         if not create or not kind:continue
         bits=create.split();key=Path(name).stem.lower();kind=kind.lower()
         if bits[0].lower()=='soldiermeshitem' and key in mesh_paths:
-            templates[key]={'kind':'mesh','materialType':kind,'mesh':mesh(key,kind),'texture':None,'coordinate':[0,0],'size':[0,0]}
+            try:converted=mesh(key,kind)
+            except ValueError as error:
+                print('UNSUPPORTED CLOTHING GEOMETRY',key,str(error),text);continue
+            templates[key]={'kind':'mesh','materialType':kind,'mesh':converted,'texture':None,'coordinate':[0,0],'size':[0,0]}
         elif bits[0].lower()=='soldiertextureitem':
             file=value(text,'geometryTemplate.fileName');coord=value(text,'geometryTemplate.setCoordinate') or '0/0'
             if not file:continue
