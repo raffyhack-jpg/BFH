@@ -5,6 +5,14 @@ import Darwin
 import Metal
 import AppKit
 setbuf(stdout,nil)
+for i in 0..<1000 {
+    let direction=ThirdPersonCamera.direction(yaw:Float(i)*0.073,pitch:sin(Float(i)*0.011)*0.65)
+    let rotation=ThirdPersonCamera.rotation(position: -direction*4.6,target:direction*30)
+    let up=rotation.act(SIMD3<Float>(0,1,0))
+    precondition(up.y>0.79,"Camera rolled or flipped during touch look")
+    precondition(simd_length(rotation.act(SIMD3<Float>(0,0,-1))-direction)<0.0001,"Camera does not face the aiming direction")
+}
+print("Validated fixed-world-up camera across 1000 yaw/pitch frames")
 for name in ["royal", "national"] {
     let url=URL(fileURLWithPath:"Assets/Characters/\(name).dae")
     let scene=try SCNScene(url:url,options:nil)

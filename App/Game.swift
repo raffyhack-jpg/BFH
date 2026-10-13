@@ -34,6 +34,7 @@ struct MapLayout {
     var bases:[V2],objectives:[V2],blocks:[Block]
     var extent:Double,gridStep:Double
     var walkable:(V2)->Bool
+    var airborneFree:((V2,Double)->Bool)?=nil
 }
 struct Objective { var p: V2; var progress: Double = 0; var owner: Int = -1 }
 struct Flag { var home: V2; var p: V2; var carrier: Int?; var droppedAt: Double = 0 }
@@ -41,6 +42,7 @@ final class Hero {
     let id: Int; let team: Int; let kind: HeroClass
     var p: V2; var facing: Double = 0; var hp: Double
     var respawn: Double = 0; var invulnerable: Double = 2
+    var elevation=0.0,verticalVelocity=0.0
     var cooldown: Double = 0; var ability: Double = 0
     var think: Double = 0; var path: [V2] = []; var target: V2 = .zero
     var kills = 0; var deaths = 0; var lastAttacker: Int?
@@ -50,7 +52,7 @@ final class Hero {
     }
 }
 struct Shot { var from: V2; var to: V2; var team: Int }
-struct Input { var move = V2.zero; var yaw: Double = 0; var fire = false; var ability = false }
+struct Input { var move = V2.zero; var yaw: Double = 0; var fire = false; var ability = false; var jump=false }
 struct RNG {
     var state: UInt64 = 42
     mutating func next() -> Double {
@@ -118,9 +120,17 @@ final class Game {
     func move(_ h: Hero, _ direction: V2, _ dt: Double) {
         let d=direction.unit * (h.kind.speed*dt)
         let x=V2(x:h.p.x+d.x,z:h.p.z)
-        if free(x) { h.p.x=x.x }
+        if canMove(x,h) { h.p.x=x.x }
         let z=V2(x:h.p.x,z:h.p.z+d.z)
-        if free(z) { h.p.z=z.z }
+        if canMove(z,h) { h.p.z=z.z }
+    }
+    func canMove(_ p:V2,_ h:Hero)->Bool {
+        if h.elevation>0.05,let airborne=mapLayout?.airborneFree { return abs(p.x)<(mapLayout?.extent ?? 28) && abs(p.z)<(mapLayout?.extent ?? 18) && airborne(p,h.elevation) }
+        return free(p)
+    }
+    func jump(_ h:Hero) {
+        guard !paused,winner==nil,h.alive,h.elevation<=0.001,h.verticalVelocity<=0 else { return }
+        h.verticalVelocity=7.5
     }
     // Grid A*: deterministic, small bounded arena; collision footprint matches movement.
     func route(_ a: V2, _ b: V2) -> [V2] {
@@ -238,7 +248,7 @@ final class Game {
         let target=heroes.filter {
             guard $0.team != h.team && $0.alive else { return false }
             let d=$0.p-h.p; let alignment=d.unit.x*direction.x+d.unit.z*direction.z
-            return d.length<h.kind.range && alignment>(bot ? 0.96 : 0.985) && visible(h.p,$0.p)
+            return d.length<h.kind.range && alignment>0.96 && visible(h.p,$0.p)
         }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
         var end=h.p+direction*h.kind.range
         if let target=target {
@@ -270,16 +280,21 @@ final class Game {
         guard !paused, winner == nil else { return }
         let dt=max(0,min(dt,0.05)); elapsed+=dt; shots=[]
         for h in heroes {
+            if h.elevation>0 || h.verticalVelocity>0 {
+                h.verticalVelocity-=20*dt;h.elevation=max(0,h.elevation+h.verticalVelocity*dt)
+                if h.elevation==0 { h.verticalVelocity=0 }
+            }
             h.cooldown=max(0,h.cooldown-dt); h.ability=max(0,h.ability-dt); h.invulnerable=max(0,h.invulnerable-dt)
             if !h.alive {
                 h.respawn-=dt
                 if h.respawn<=0 && mode != .elimination {
-                    h.hp=h.kind.hp; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[]
+                    h.hp=h.kind.hp; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.elevation=0;h.verticalVelocity=0
                 }
                 continue
             }
             if h.p.distance(bases[h.team])<4 { h.hp=min(h.kind.hp,h.hp+8*dt) }
             if h.id == 0 && !autopilot {
+                if input.jump { jump(h) }
                 h.facing=input.yaw; move(h,input.move,dt)
                 if input.fire { shoot(h,aim:V2(x:sin(h.facing),z:cos(h.facing)),bot:false) }
                 if input.ability { ability(h) }

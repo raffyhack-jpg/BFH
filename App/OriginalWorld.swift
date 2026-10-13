@@ -56,9 +56,9 @@ final class OriginalWorld {
         }
         return result
     }
-    func clearWalls(_ p:V2)->Bool {
+    func clearWalls(_ p:V2,above:Float=0)->Bool {
         let triangles=wallCells[Int(floor(p.x/8))*10000+Int(floor(p.z/8))] ?? []
-        let feet=height(p)
+        let feet=height(p)+above
         for t in triangles {
             for offset in [Float(0.3),Float(1.0),Float(1.65)] {
                 let level=feet+offset
@@ -102,6 +102,27 @@ final class OriginalWorld {
         }
         cache[name]=root;return root.clone()
     }
+    func cameraPosition(from:SIMD3<Float>,to:SIMD3<Float>)->SIMD3<Float> {
+        let direction=to-from;let distance=simd_length(direction)
+        guard distance>0.01 else { return to }
+        var fraction:Float=1
+        let minX=Int(floor((min(from.x,to.x)-0.5)/8)),maxX=Int(floor((max(from.x,to.x)+0.5)/8))
+        let minZ=Int(floor((min(from.z,to.z)-0.5)/8)),maxZ=Int(floor((max(from.z,to.z)+0.5)/8))
+        for x in minX...maxX { for z in minZ...maxZ { for t in wallCells[x*10000+z] ?? [] {
+            let a=SIMD3(t[0],t[1],t[2]),b=SIMD3(t[3],t[4],t[5]),c=SIMD3(t[6],t[7],t[8])
+            let e1=b-a,e2=c-a,p=simd_cross(direction,e2),det=simd_dot(e1,p)
+            if abs(det)<0.000001 { continue }
+            let v=from-a,u=simd_dot(v,p)/det
+            if u<0 || u>1 { continue }
+            let q=simd_cross(v,e1),w=simd_dot(direction,q)/det
+            if w<0 || u+w>1 { continue }
+            let hit=simd_dot(e2,q)/det
+            if hit>0 && hit<fraction { fraction=max(0.08,hit-0.25/distance) }
+        } } }
+        var result=from+direction*fraction
+        result.y=max(result.y,height(V2(x:Double(result.x),z:Double(result.z)))+0.35)
+        return result
+    }
     func populate(_ root:SCNNode) throws {
         root.addChildNode(try model("terrain"))
         for instance in map.instances {
@@ -134,6 +155,14 @@ final class OriginalWorld {
     var layout:MapLayout {
         MapLayout(bases:map.bases.map{V2(x:$0[0],z:$0[1])},objectives:map.objectives.map{V2(x:$0[0],z:$0[1])},blocks:[],extent:240,gridStep:1.5,walkable:{ [self] p in
             clearWalls(p) && height(p)>Float(map.waterHeight)+0.4 && abs(height(p+V2(x:1,z:0))-height(p-V2(x:1,z:0)))<1.8 && abs(height(p+V2(x:0,z:1))-height(p-V2(x:0,z:1)))<1.8
-        })
+        },airborneFree:{ [self] p,elevation in clearWalls(p,above:Float(elevation)) && height(p)>Float(map.waterHeight)+0.4 })
+    }
+}
+
+enum ThirdPersonCamera {
+    static func direction(yaw:Float,pitch:Float)->SIMD3<Float> { SIMD3(sin(yaw)*cos(pitch),-sin(pitch),cos(yaw)*cos(pitch)) }
+    static func rotation(position:SIMD3<Float>,target:SIMD3<Float>)->simd_quatf {
+        let back=simd_normalize(position-target),right=simd_normalize(simd_cross(SIMD3<Float>(0,1,0),back)),up=simd_cross(back,right)
+        return simd_quatf(simd_float3x3(columns:(right,up,back)))
     }
 }

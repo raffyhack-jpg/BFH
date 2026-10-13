@@ -32,6 +32,15 @@ let nav=Game(mode:.conquest,hero:.soldier)
 let path=nav.route(V2(x:-17,z:0),V2(x:17,z:0))
 check(!path.isEmpty,"Pathfinding failed"); check(path.allSatisfy { nav.free($0) },"Path intersects building")
 let pause=Game(mode:.conquest,hero:.soldier); pause.paused=true; pause.update(0.05); check(pause.elapsed == 0,"Pause advances simulation")
+let jumping=Game(mode:.conquest,hero:.soldier)
+let airborne=jumping.heroes[0]
+jumping.jump(airborne)
+var peak=0.0
+for _ in 0..<12 { jumping.update(0.05);peak=max(peak,airborne.elevation) }
+check(peak>1 && peak<2,"Jump arc is not usable")
+let velocity=airborne.verticalVelocity;jumping.jump(airborne);check(airborne.verticalVelocity==velocity,"Double jump was allowed")
+for _ in 0..<30 { jumping.update(0.05) }
+check(airborne.elevation==0 && airborne.verticalVelocity==0,"Jump did not land")
 for mode in Mode.allCases {
     let game=Game(mode:mode,hero:.soldier,seed:72)
     for _ in 0..<6200 {
