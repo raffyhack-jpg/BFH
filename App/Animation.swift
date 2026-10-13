@@ -171,9 +171,11 @@ final class OriginalWardrobe {
         for id in loadout.clothing.sorted(by:{$0.key<$1.key}).map(\.value) { refs += byID[id]?.templates ?? [] }
         refs.sort{$0.layer<$1.layer}
         var meshes:[String:String]=[:],layers:[String:[ClothingTemplate]]=[:]
-        for ref in refs { guard let t=catalog.templates[ref.name] else { continue }
-            if let file=t.mesh { meshes[t.materialType]=file }
-            if t.texture != nil { layers[t.materialType,default:[]].append(t) }
+        for ref in refs { if let t=catalog.templates[ref.name],let file=t.mesh { meshes[t.materialType]=file } }
+        for ref in refs { guard let t=catalog.templates[ref.name],t.texture != nil else {continue}
+            // Head-hair and hand overlays can use the existing head/body skin.
+            let type=t.materialType=="cit_headhair" && meshes["cit_headhair"]==nil ? "cit_head" : t.materialType=="cit_hands" && meshes["cit_hands"]==nil ? "cit_body" : t.materialType
+            layers[type,default:[]].append(t)
         }
         var materials:[String:CGImage]=[:]
         for type in Set(meshes.keys).union(layers.keys) {
@@ -188,7 +190,8 @@ final class OriginalWardrobe {
             let minimum=canvases[type] ?? [8,8]
             func rounded(_ value:Int)->Int { max(8,((value+7)/8)*8) }
             func power(_ value:Int)->Int { var p=1;while p<value {p*=2};return p }
-            let requiredWidth=stack.map{$0.coordinate[0]+$0.size[0]}.max() ?? 0,requiredHeight=stack.map{$0.coordinate[1]+$0.size[1]}.max() ?? 0
+            let sizing=stack.filter{!(type=="cit_body" && $0.materialType=="cit_hands")}
+            let requiredWidth=sizing.map{$0.coordinate[0]+$0.size[0]}.max() ?? 0,requiredHeight=sizing.map{$0.coordinate[1]+$0.size[1]}.max() ?? 0
             let width=canvasOverrides[type]?[0] ?? (type=="cit_body" ? power(max(minimum[0],requiredWidth)) : max(minimum[0],rounded(requiredWidth)))
             let height=canvasOverrides[type]?[1] ?? (type=="cit_body" ? power(max(minimum[1],requiredHeight)) : max(minimum[1],rounded(requiredHeight)))
             guard let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:width*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
@@ -196,7 +199,8 @@ final class OriginalWardrobe {
             if ["cit_head","cit_headhair","cit_body","cit_hands","cit_legs","cit_feet"].contains(type) { context.setFillColor(CGColor(red:CGFloat(tone[0])/255,green:CGFloat(tone[1])/255,blue:CGFloat(tone[2])/255,alpha:1));context.fill(CGRect(x:0,y:0,width:width,height:height)) }
             for layer in stack { if let file=layer.texture,let original=image(file) {
                 let skinBase=file==catalog.templates[prefix+"head001_head001"]?.texture || file==catalog.templates[prefix+"body001_body001"]?.texture
-                let im=skinBase || type.contains("hair") ? tinted(original,tone:tone) : original
+                let layerTone=layer.materialType.contains("hair") ? catalog.colors.first{$0.kind=="hair" && $0.id==loadout.hair}?.rgb ?? tone : tone
+                let im=skinBase || layer.materialType.contains("hair") ? tinted(original,tone:layerTone) : original
                 context.draw(im,in:CGRect(x:layer.coordinate[0],y:height-layer.coordinate[1]-im.height,width:im.width,height:im.height))
             } }
             materials[type]=context.makeImage()
