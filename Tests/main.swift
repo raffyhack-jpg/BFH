@@ -160,7 +160,18 @@ let raid=Game(mode:.flags,hero:.soldier),raiderID=2
 let raider=raid.heroes[raiderID],flank=raid.objective(for:raid.heroes[raiderID])
 check(flank != raid.flags[1].p && raid.free(flank),"Raider must choose a walkable flanking waypoint")
 raider.p=flank
+check(raid.objective(for:raider)==flank,"Lone raider must briefly regroup before advancing")
+raid.elapsed+=3.1
 check(raid.objective(for:raider)==raid.flags[1].p,"Raider must advance to the flag after reaching its flank")
 raider.p=flank+V2(x:2,z:0)
 check(raid.objective(for:raider)==raid.flags[1].p,"Raider must not oscillate back to its completed waypoint")
 print("Validated committed flanking routes without waypoint oscillation")
+
+let safeReturn=Game(mode:.flags,hero:.soldier)
+let courier=safeReturn.heroes[2]
+courier.p=safeReturn.flags[1].home;safeReturn.flags[1].carrier=courier.id
+let coveredRoute=safeReturn.objective(for:courier)
+check(coveredRoute != safeReturn.flags[0].home && safeReturn.free(coveredRoute),"Carrier must return through a walkable flank")
+courier.p=coveredRoute
+check(safeReturn.objective(for:courier)==safeReturn.flags[0].home,"Carrier must continue home after clearing the flank")
+print("Validated covered carrier returns and bounded raider regrouping")

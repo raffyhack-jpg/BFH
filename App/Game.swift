@@ -84,7 +84,8 @@ final class Hero {
     func equip(_ weapons:[WeaponProfile]) { equipped=weapons;ammunition=weapons.map{$0.magazine};weaponSlot=0;reloadRemaining=0 }
     var recentShot=0.0
     var cooldown: Double = 0; var ability: Double = 0
-    var raidWaypoint:V2?=nil,raidComplete=false
+    var raidWaypoint:V2?=nil,raidComplete=false,raidReadyAt:Double?=nil
+    var returnWaypoint:V2?=nil,returnComplete=false,wasCarrier=false
     var think: Double = 0; var path: [V2] = []; var target: V2 = .zero
     var kills = 0; var deaths = 0; var lastAttacker: Int?
     var alive: Bool { hp > 0 }
@@ -238,7 +239,22 @@ final class Game {
     func flagCarrier(_ h:Hero)->Bool { mode == .flags && flags[1-h.team].carrier == h.id }
     func objective(for h: Hero) -> V2 {
         // A carrier must return the flag even while wounded.
-        if flagCarrier(h) { return flags[h.team].home }
+        if flagCarrier(h) {
+            let home=flags[h.team].home,enemy=flags[1-h.team].home
+            if !h.wasCarrier {
+                h.wasCarrier=true;h.returnComplete=h.p.distance(home)<home.distance(enemy)*0.35
+                let axis=(enemy-home).unit,side=V2(x:axis.z,z:-axis.x),midpoint=(home+enemy)*0.5
+                let offset=min(36,home.distance(enemy)*0.28)
+                let left=nearestFree(midpoint+side*offset),right=nearestFree(midpoint-side*offset)
+                h.returnWaypoint=h.raidWaypoint ?? (h.p.distance(left)<h.p.distance(right) ? left : right)
+            }
+            if !h.returnComplete,let waypoint=h.returnWaypoint {
+                if h.p.distance(waypoint)>1.8 { return waypoint }
+                h.returnComplete=true
+            }
+            return home
+        }
+        h.wasCarrier=false;h.returnWaypoint=nil;h.returnComplete=false
         if h.hp < h.kind.hp*0.25 { return bases[h.team] }
         switch mode {
         case .flags:
@@ -268,7 +284,7 @@ final class Game {
             if defenders.contains(where:{$0.id==h.id}) {
                 return nearestFree(home.home+(enemy.home-home.home).unit*4+V2(x:0,z:Double(h.id%3)-1))
             }
-            if h.p.distance(home.home)<4 && h.raidComplete { h.raidComplete=false;h.raidWaypoint=nil }
+            if h.p.distance(home.home)<4 && h.raidComplete { h.raidComplete=false;h.raidWaypoint=nil;h.raidReadyAt=nil }
             if !h.raidComplete {
                 if h.raidWaypoint==nil {
                     let axis=(enemy.home-home.home).unit,side=V2(x:axis.z,z:-axis.x)
@@ -278,6 +294,9 @@ final class Game {
                 }
                 if let waypoint=h.raidWaypoint {
                     if h.p.distance(waypoint)>1.8 { return waypoint }
+                    if h.raidReadyAt==nil { h.raidReadyAt=elapsed }
+                    let ready=squad.filter { $0.id != h.id && ($0.raidWaypoint?.distance(waypoint) ?? 1000)<4 && $0.p.distance(waypoint)<6 }
+                    if ready.isEmpty && elapsed-(h.raidReadyAt ?? elapsed)<3 { return waypoint }
                     h.raidComplete=true
                 }
             }
@@ -408,7 +427,7 @@ final class Game {
             if !h.alive {
                 h.respawn-=dt
                 if h.respawn<=0 && mode != .elimination {
-                    h.hp=h.kind.hp;h.ammunition=h.equipped.map{$0.magazine};h.reloadRemaining=0; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.raidWaypoint=nil;h.raidComplete=false;h.elevation=0;h.verticalVelocity=0
+                    h.hp=h.kind.hp;h.ammunition=h.equipped.map{$0.magazine};h.reloadRemaining=0; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.raidWaypoint=nil;h.raidComplete=false;h.raidReadyAt=nil;h.returnWaypoint=nil;h.returnComplete=false;h.wasCarrier=false;h.elevation=0;h.verticalVelocity=0
                 }
                 continue
             }

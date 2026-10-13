@@ -9,7 +9,20 @@ concurrency:
 permissions:
   contents: write
 jobs:
+  simulation:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate gameplay and bot tactics
+        run: |
+          mkdir -p build
+          swiftc -O App/Game.swift Tests/main.swift -o build/core-tests
+          build/core-tests
   build:
+    needs: simulation
     runs-on: macos-15
     timeout-minutes: 20
     steps:
