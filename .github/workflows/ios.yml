@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Check controls and compile native screens
+        run: bash scripts/check_source.sh
       - name: Restore verified original client archive
         uses: actions/cache/restore@v4
         with:
