@@ -50,7 +50,7 @@ for mode in Mode.allCases {
     }
     check(game.winner != nil,"Match never ends: \(mode)")
     check(game.heroes.contains{$0.kills>0},"Bots never fought: \(mode)")
-    print("Bots completed \(mode.rawValue): \(Int(game.elapsed))s, winner \(game.winner!), score \(game.score)")
+    print("Bots completed \(mode.rawValue): \(Int(game.elapsed))s, winner \(game.winner!), score \(game.score), flag pickups \(game.flagPickups)")
 }
 print("All core checks passed")
 
@@ -155,3 +155,12 @@ let injury=patient.hp
 fieldMedic.update(0.05)
 check(patient.hp>injury && medic.ability>0,"Healthy soldier bot must heal a wounded teammate even between fights")
 print("Validated autonomous flag capture around buildings and proactive squad healing")
+
+let raid=Game(mode:.flags,hero:.soldier),raiderID=2
+let raider=raid.heroes[raiderID],flank=raid.objective(for:raid.heroes[raiderID])
+check(flank != raid.flags[1].p && raid.free(flank),"Raider must choose a walkable flanking waypoint")
+raider.p=flank
+check(raid.objective(for:raider)==raid.flags[1].p,"Raider must advance to the flag after reaching its flank")
+raider.p=flank+V2(x:2,z:0)
+check(raid.objective(for:raider)==raid.flags[1].p,"Raider must not oscillate back to its completed waypoint")
+print("Validated committed flanking routes without waypoint oscillation")

@@ -84,6 +84,7 @@ final class Hero {
     func equip(_ weapons:[WeaponProfile]) { equipped=weapons;ammunition=weapons.map{$0.magazine};weaponSlot=0;reloadRemaining=0 }
     var recentShot=0.0
     var cooldown: Double = 0; var ability: Double = 0
+    var raidWaypoint:V2?=nil,raidComplete=false
     var think: Double = 0; var path: [V2] = []; var target: V2 = .zero
     var kills = 0; var deaths = 0; var lastAttacker: Int?
     var alive: Bool { hp > 0 }
@@ -116,6 +117,7 @@ final class Game {
         Block(center:V2(x:-10,z:9),half:V2(x:2,z:4)), Block(center:V2(x:10,z:-9),half:V2(x:2,z:4)),
         Block(center:V2(x:0,z:-10),half:V2(x:3,z:2)), Block(center:V2(x:0,z:10),half:V2(x:3,z:2)),
         Block(center:V2(x:-5,z:0),half:V2(x:1,z:2)), Block(center:V2(x:5,z:0),half:V2(x:1,z:2))]
+    var flagPickups=[0,0]
     var score = [0.0,0.0]; var tickets = [70.0,70.0]
     var elapsed = 0.0; var winner: Int?; var shots: [Shot] = []; var message = ""
     var rng = RNG(); var paused = false
@@ -266,6 +268,19 @@ final class Game {
             if defenders.contains(where:{$0.id==h.id}) {
                 return nearestFree(home.home+(enemy.home-home.home).unit*4+V2(x:0,z:Double(h.id%3)-1))
             }
+            if h.p.distance(home.home)<4 && h.raidComplete { h.raidComplete=false;h.raidWaypoint=nil }
+            if !h.raidComplete {
+                if h.raidWaypoint==nil {
+                    let axis=(enemy.home-home.home).unit,side=V2(x:axis.z,z:-axis.x)
+                    let midpoint=(home.home+enemy.home)*0.5
+                    let offset=min(36,home.home.distance(enemy.home)*0.28)*(h.id%2==0 ? 1.0 : -1.0)
+                    h.raidWaypoint=nearestFree(midpoint+side*offset)
+                }
+                if let waypoint=h.raidWaypoint {
+                    if h.p.distance(waypoint)>1.8 { return waypoint }
+                    h.raidComplete=true
+                }
+            }
             return enemy.p
         case .conquest, .rocket:
             let candidates=objectives.filter { $0.owner != h.team }
@@ -393,7 +408,7 @@ final class Game {
             if !h.alive {
                 h.respawn-=dt
                 if h.respawn<=0 && mode != .elimination {
-                    h.hp=h.kind.hp;h.ammunition=h.equipped.map{$0.magazine};h.reloadRemaining=0; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.elevation=0;h.verticalVelocity=0
+                    h.hp=h.kind.hp;h.ammunition=h.equipped.map{$0.magazine};h.reloadRemaining=0; h.p=nearestFree(bases[h.team]+V2(x:0,z:Double(h.id%8)-3.5)); h.invulnerable=2; h.path=[];h.raidWaypoint=nil;h.raidComplete=false;h.elevation=0;h.verticalVelocity=0
                 }
                 continue
             }
@@ -472,7 +487,7 @@ final class Game {
                 else {
                     if flags[t].p.distance(flags[t].home)>1 && elapsed-flags[t].droppedAt>18 { flags[t].p=flags[t].home }
                     for h in heroes where h.alive && h.p.distance(flags[t].p)<1.6 {
-                        if h.team != t { flags[t].carrier=h.id; break }
+                        if h.team != t { flags[t].carrier=h.id;flagPickups[h.team]+=1; break }
                         else if flags[t].p.distance(flags[t].home)>1 { flags[t].p=flags[t].home }
                     }
                 }
