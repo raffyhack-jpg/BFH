@@ -109,6 +109,7 @@ for faction in 1...2 {for kind in HeroClass.allCases {
     precondition(loadout.clothing.count>=4 && loadout.weapons.count==2,"Original default kit is incomplete")
     let actor=try AnimatedCharacter(faction==1 ? "royal" : "national",directory:URL(fileURLWithPath:"Assets/Characters",isDirectory:true))
     try wardrobe.apply(loadout,faction:faction,to:actor)
+    precondition(actor.visual.childNodes.contains{$0.geometry?.name=="cit_hands" && ($0.geometry?.sources(for:.vertex).first?.vectorCount ?? 0)>0},"Original default outfit has no hand geometry")
     for _ in 0..<10 {actor.update(1.0/30,position:.zero,moving:true,firing:false,ability:false,alive:true,jumping:true)}
     precondition(actor.asset.clips["jumpLoop"] != nil,"Original jump animation missing")
     print("Validated original outfit: faction \(faction), \(kind.rawValue), \(loadout.clothing), weapons \(loadout.weapons)")

@@ -42,7 +42,7 @@ let velocity=airborne.verticalVelocity;jumping.jump(airborne);check(airborne.ver
 for _ in 0..<30 { jumping.update(0.05) }
 check(airborne.elevation==0 && airborne.verticalVelocity==0,"Jump did not land")
 for mode in Mode.allCases {
-    let game=Game(mode:mode,hero:.soldier,seed:72)
+    let game=Game(mode:mode,hero:.soldier,seed:72,roundDuration:300)
     for _ in 0..<6200 {
         game.update(0.05,autopilot:true)
         for h in game.heroes { check(h.p.x.isFinite && h.p.z.isFinite && game.free(h.p),"Invalid bot position in \(mode)") }
@@ -207,3 +207,14 @@ hitEvents.hurt(enemyEvent,10000,attacker:shooter)
 check(hitEvents.feedback.last?.damage==remainingHP && hitEvents.feedback.last?.killed==true,"Hit feedback must report actual damage, not overkill")
 check(shooter.matchXP==remainingHP+50 && hitEvents.scoreFeedback.last?.reason=="ENEMY ELIMINATED","Actual damage and elimination XP events failed")
 print("Validated persistent careers, original level thresholds, Hero Points, purchases, missions and combat feedback")
+
+// Match endings have explicit, stable causes. Pausing never consumes the visible timer.
+for mode in Mode.allCases {
+    let g=Game(mode:mode,hero:.soldier,roundDuration:900);g.heroes.forEach{$0.think=1000};g.elapsed=300;g.update(0.05)
+    check(g.winner==nil,"Old hidden five-minute cutoff is still active in \(mode)")
+    let remaining=g.remainingSeconds;g.paused=true;g.update(0.05);check(g.remainingSeconds==remaining,"Paused timer advances")
+    g.paused=false;g.elapsed=899.99;g.update(0.05);check(g.winner != nil && g.endReason.contains("Time limit"),"Timed round ended without a reason")
+    let result=g.winner,reason=g.endReason;g.finish(1,reason:"duplicate");check(g.winner==result && g.endReason==reason,"End result was overwritten")
+}
+check(elimination.endReason.contains("Elimination") && rocket.endReason.contains("60 seconds"),"Objective win reasons are missing")
+print("Validated visible 15-minute rounds, pause-safe clock and explicit idempotent end reasons")

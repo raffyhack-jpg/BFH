@@ -166,10 +166,13 @@ final class Game {
     var feedback:[CombatFeedback]=[],scoreFeedback:[ScoreFeedback]=[]
     var flagPickups=[0,0]
     var score = [0.0,0.0]; var tickets = [70.0,70.0]
+    var roundDuration:Double
+    var endReason=""
+    var remainingSeconds:Int {max(0,Int(ceil(roundDuration-elapsed)))}
     var elapsed = 0.0; var winner: Int?; var shots: [Shot] = []; var message = ""
     var rng = RNG(); var paused = false
-    init(mode: Mode, hero: HeroClass, seed: UInt64 = 42, layout:MapLayout?=nil,playerTeam:Int=0) {
-        self.mode=mode; rng.state=seed
+    init(mode: Mode, hero: HeroClass, seed: UInt64 = 42, layout:MapLayout?=nil,playerTeam:Int=0,roundDuration:Double=900) {
+        self.mode=mode;self.roundDuration=max(1,roundDuration); rng.state=seed
         mapLayout=layout
         if let layout=layout { bases=layout.bases; blocks=layout.blocks }
         for b in blocks {
@@ -186,7 +189,7 @@ final class Game {
         for i in 0..<16 {
             let team = i < 8 ? playerTeam : 1-playerTeam
             let kind = i == 0 ? hero : HeroClass.allCases[i%3]
-            heroes.append(Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%8)-3.5))))
+            let h=Hero(i,team,kind,nearestFree(bases[team]+V2(x:0,z:Double(i%8)-3.5)));h.think=Double(i%8)*0.09;heroes.append(h)
         }
     }
     func free(_ p: V2) -> Bool {
@@ -465,9 +468,11 @@ final class Game {
             h.invulnerable=0.6; if h.id == 0 { message="Dash" }
         }
     }
+    func finish(_ team:Int,reason:String){guard winner==nil else{return};winner=team;endReason=reason}
     func update(_ dt: Double, input: Input = Input(), autopilot: Bool = false) {
         guard !paused, winner == nil else { return }
         let dt=max(0,min(dt,0.05)); elapsed+=dt; shots=[]
+        var pathBudget=1
         for h in heroes {
             if h.elevation>0 || h.verticalVelocity>0 {
                 h.verticalVelocity-=20*dt;h.elevation=max(0,h.elevation+h.verticalVelocity*dt)
@@ -496,7 +501,10 @@ final class Game {
             }
             h.think-=dt
             if h.think<=0 {
-                h.think=0.55+rng.next()*0.3; h.target=objective(for:h); h.path=route(h.p,h.target)
+                let destination=objective(for:h)
+                let needsPath=(h.path.isEmpty && h.p.distance(destination)>0.8) || h.target.distance(destination)>2.5
+                if needsPath && pathBudget==0 {h.think=0.04}
+                else {h.think=0.55+rng.next()*0.3;if needsPath {h.path=route(h.p,destination);pathBudget-=1};h.target=destination}
             }
             let detection=max(10,h.equipped.map(\.range).max() ?? h.weaponRange)
             let enemy=heroes.filter { $0.team != h.team && $0.alive && $0.p.distance(h.p)<detection && visible(h.p,$0.p) }.min { $0.p.distance(h.p)<$1.p.distance(h.p) }
@@ -553,11 +561,11 @@ final class Game {
             }
             if mode == .conquest {
                 let a=objectives.filter { $0.owner == 0 }.count, b=objectives.filter { $0.owner == 1 }.count
-                if a>b { tickets[1]-=dt*Double(a-b)*0.7 }; if b>a { tickets[0]-=dt*Double(b-a)*0.7 }
-                if tickets[0]<=0 { winner=1 }; if tickets[1]<=0 { winner=0 }
+                if a>b { tickets[1]-=dt*Double(a-b)*0.12 }; if b>a { tickets[0]-=dt*Double(b-a)*0.12 }
+                if tickets[0]<=0 || tickets[1]<=0 {finish(tickets[0]<=0 && tickets[1]<=0 ? -1 : tickets[0]<=0 ? 1 : 0,reason:"Conquest • enemy tickets exhausted")}
             } else if objectives[0].owner>=0 {
                 let team=objectives[0].owner; score[team]+=dt
-                if score[team]>=60 { winner=team }
+                if score[team]>=60 {finish(team,reason:"Rocket Control • held the objective for 60 seconds")}
             }
         case .flags:
             for t in 0..<2 {
@@ -573,17 +581,21 @@ final class Game {
             for t in 0..<2 {
                 if let id=flags[1-t].carrier, heroes[id].p.distance(flags[t].home)<2.5, flags[t].carrier == nil, flags[t].p.distance(flags[t].home)<1 {
                     score[t]+=1;heroes[id].captures+=1;award(heroes[id],150,reason:"FLAG CAPTURED"); flags[1-t].carrier=nil; flags[1-t].p=flags[1-t].home; message=t == 0 ? "Blue captured!" : "Red captured!"
-                    if score[t]>=3 { winner=t }
+                    if score[t]>=3 {finish(t,reason:"Capture the Flag • 3 flags captured")}
                 }
             }
         case .elimination:
-            if !heroes.contains(where: { $0.team == 0 && $0.alive }) { winner=1 }
-            if !heroes.contains(where: { $0.team == 1 && $0.alive }) { winner=0 }
+            let blueAlive=heroes.contains{$0.team==0 && $0.alive},redAlive=heroes.contains{$0.team==1 && $0.alive}
+            if !blueAlive || !redAlive {finish(!blueAlive && !redAlive ? -1 : blueAlive ? 0 : 1,reason:"Elimination • opposing squad eliminated")}
         }
-        if elapsed>=300 && winner == nil {
+        if elapsed>=roundDuration && winner == nil {
             let a=mode == .conquest ? tickets[0] : mode == .elimination ? Double(heroes.filter{$0.team == 0 && $0.alive}.count) : score[0]
             let b=mode == .conquest ? tickets[1] : mode == .elimination ? Double(heroes.filter{$0.team == 1 && $0.alive}.count) : score[1]
-            winner=a == b ? -1 : a>b ? 0 : 1
+            finish(abs(a-b)<0.001 ? -1 : a>b ? 0 : 1,reason:"Time limit reached • \(Int(roundDuration/60)) minute round")
         }
     }
+}
+
+extension Mode {
+    var rules:String {switch self{case .conquest:return "Capture flags and drain enemy tickets • 15 minute round";case .flags:return "First to capture 3 flags wins • 15 minute round";case .elimination:return "Eliminate the opposing squad • no respawns";case .rocket:return "Hold the rocket for 60 total seconds to win"}}
 }

@@ -16,16 +16,19 @@ PY
 xcrun simctl boot "$DEVICE" || true
 xcrun simctl bootstatus "$DEVICE" -b
 xcrun simctl install "$DEVICE" build/SimulatorData/Build/Products/Release-iphonesimulator/PocketFront.app
-for page in menu wardrobe abilities gameplay; do
+for page in menu wardrobe abilities navigation gameplay; do
   xcrun simctl terminate "$DEVICE" com.pocketfront.game || true
   xcrun simctl launch "$DEVICE" com.pocketfront.game "--qa-$page"
   sleep 12
   xcrun simctl io "$DEVICE" screenshot "build/original-$page-native.png"
 done
+DATA_CONTAINER=$(xcrun simctl get_app_container "$DEVICE" com.pocketfront.game data)
+cp "$DATA_CONTAINER/Documents/mobile-menu-check.json" build/mobile-menu-check.json
+cat build/mobile-menu-check.json
 build/asset-python/bin/python - <<'PY'
 from PIL import Image
 import io,base64
-for page in ('menu','wardrobe','abilities','gameplay'):
+for page in ('menu','wardrobe','abilities','navigation','gameplay'):
  path=f'build/original-{page}-native.png';im=Image.open(path)
  if im.height>im.width:im=im.transpose(Image.Transpose.ROTATE_90);im.save(path)
  im.thumbnail((1400,900));b=io.BytesIO();im.convert('RGB').save(b,format='JPEG',quality=85)

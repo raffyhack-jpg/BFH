@@ -98,7 +98,7 @@ final class OriginalWorld {
             if let texture=part.texture { m.diffuse.contents=directory.appendingPathComponent(texture) }
             m.diffuse.wrapS = .repeat; m.diffuse.wrapT = .repeat
             m.lightingModel = .lambert; m.isDoubleSided=part.alpha; g.materials=[m]
-            root.addChildNode(SCNNode(geometry:g))
+            let node=SCNNode(geometry:g);node.castsShadow=false;root.addChildNode(node)
         }
         cache[name]=root;return root.clone()
     }

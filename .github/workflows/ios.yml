@@ -71,7 +71,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="prototype-${GITHUB_SHA:0:12}"
-          files=(build/PocketFront-unsigned.ipa build/original-menu-native.png build/original-wardrobe-native.png build/original-abilities-native.png build/original-gameplay-native.png)
+          files=(build/PocketFront-unsigned.ipa build/original-menu-native.png build/original-wardrobe-native.png build/original-abilities-native.png build/original-gameplay-native.png build/original-navigation-native.png build/mobile-menu-check.json)
           if [ -f build/original-map-preview.png ]; then files+=(build/original-map-preview.png); fi
           if [ -f build/original-wardrobe-preview.png ]; then files+=(build/original-wardrobe-preview.png); fi
           if gh release view "$tag" >/dev/null 2>&1; then

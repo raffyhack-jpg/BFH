@@ -49,7 +49,7 @@ final class AnimatedCharacter {
             }
             for i in stride(from:0,to:part.uv.count,by:2) { uv.append(CGPoint(x:CGFloat(part.uv[i]),y:CGFloat(part.uv[i+1]))) }
             let element=SCNGeometryElement(data:Self.data(part.faces),primitiveType:.triangles,primitiveCount:part.faces.count/3,bytesPerIndex:4)
-            let geometry=SCNGeometry(sources:[SCNGeometrySource(vertices:positions),SCNGeometrySource(normals:normals),SCNGeometrySource(textureCoordinates:uv)],elements:[element])
+            let geometry=SCNGeometry(sources:[SCNGeometrySource(vertices:positions),SCNGeometrySource(normals:normals),SCNGeometrySource(textureCoordinates:uv)],elements:[element]);geometry.name=part.materialType ?? "base"
             let material=SCNMaterial(); material.diffuse.contents=(textures[part.materialType ?? ""] as Any?) ?? directory.appendingPathComponent("\(faction)_t0.png"); if textures[part.materialType ?? ""] != nil { var transform=SCNMatrix4MakeScale(1,-1,1);transform.m42=1;material.diffuse.contentsTransform=transform };material.roughness.contents=0.95;material.lightingModel = .lambert;material.isDoubleSided=true; geometry.materials=[material]
             let weights=SCNGeometrySource(data:Self.data(part.weights),semantic:.boneWeights,vectorCount:positions.count,usesFloatComponents:true,componentsPerVector:2,bytesPerComponent:4,dataOffset:0,dataStride:8)
             let indices=SCNGeometrySource(data:Self.data(part.indices),semantic:.boneIndices,vectorCount:positions.count,usesFloatComponents:false,componentsPerVector:2,bytesPerComponent:2,dataOffset:0,dataStride:4)
@@ -88,6 +88,7 @@ final class AnimatedCharacter {
         let clip=self.clip(weaponPose+(moving ? "Run" : "Idle")) ?? asset.clips[moving ? "run" : "idle"]!
         let lower=asset.clips[moving ? "locomotionRun" : "locomotionIdle"]
         let blend=Float(1-exp(-dt*16))
+        let fireClip=self.clip(weaponPose+"Fire") ?? asset.clips["fire"],skillClip=asset.clips["ability"],reloadClip=self.clip(weaponPose+"Reload")
         for i in bones.indices {
             let bind=asset.bones[i]
             var p=SIMD3(bind.position[0],bind.position[1],bind.position[2])
@@ -97,9 +98,9 @@ final class AnimatedCharacter {
             if alive && jumping, let jump=asset.clips[jumpClock<0.2 ? "jumpStart" : "jumpLoop"],let pose=sample(jump,bone:i,time:jumpClock<0.2 ? jumpClock : jumpClock-0.2) { p=pose.0;q=pose.1 }
             if !alive, let death=death, let pose=sample(death,bone:i,time:deathTime,looping:false) { p=pose.0; q=pose.1 }
             // Preserve the locomotion legs while layering the original upper-body fire clip.
-            if alive && !reloading, i>=2 && i<=57, clock<fireUntil, let fire=self.clip(weaponPose+"Fire") ?? asset.clips["fire"], let pose=sample(fire,bone:i,time:clock) { p=pose.0; q=pose.1 }
-            if alive, i>=2 && i<=57, clock<abilityUntil, let skill=asset.clips["ability"], let pose=sample(skill,bone:i,time:clock) { p=pose.0; q=pose.1 }
-            if alive && reloading, i>=2 && i<=57,let reload=self.clip(weaponPose+"Reload"),reloadClock<Double(reload.frames)/Double(reload.fps),let pose=sample(reload,bone:i,time:reloadClock,looping:false) { p=pose.0;q=pose.1 }
+            if alive && !reloading, i>=2 && i<=57, clock<fireUntil, let fire=fireClip, let pose=sample(fire,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if alive, i>=2 && i<=57, clock<abilityUntil, let skill=skillClip, let pose=sample(skill,bone:i,time:clock) { p=pose.0; q=pose.1 }
+            if alive && reloading, i>=2 && i<=57,let reload=reloadClip,reloadClock<Double(reload.frames)/Double(reload.fps),let pose=sample(reload,bone:i,time:reloadClock,looping:false) { p=pose.0;q=pose.1 }
             if i==0 && alive { p.x=0;p.z=0;if jumping { p.y=bind.position[1] } }
             bones[i].simdPosition=simd_mix(bones[i].simdPosition,p,SIMD3(repeating:blend))
             bones[i].simdOrientation=simd_slerp(bones[i].simdOrientation,q,blend)
@@ -114,7 +115,7 @@ struct WardrobeDefault:Decodable { let appearance:[Int],equipment:[Int] }
 struct WardrobeColor:Decodable { let id:Int,name:String,kind:String;let rgb:[Int] }
 struct WardrobeWeapon:Decodable { let id:Int,name:String,faction:Int,kits:Int,weaponClass:Int;let icon:String?;let model:String;let rpm:Double,magazine:Int,reload:Double;let pose:String?,weaponType:String?;let minimumLevel:Int?,valorPrice:Int?,fundsPrice:Int? }
 struct WardrobeCatalog:Decodable { let items:[ClothingItem],templates:[String:ClothingTemplate],defaults:[String:WardrobeDefault],colors:[WardrobeColor],weapons:[WardrobeWeapon] }
-struct HeroLoadout:Codable { var clothing:[Int:Int]=[:];var weapons:[Int]=[];var skin=7;var hair=2 }
+struct HeroLoadout:Codable,Equatable { var clothing:[Int:Int]=[:];var weapons:[Int]=[];var skin=7;var hair=2 }
 extension HeroClass {
     var kit:Int { self == .scout ? 0 : self == .soldier ? 1 : 2 }
     var kitMask:Int { 1 << kit }
@@ -167,7 +168,7 @@ final class OriginalWardrobe {
     }
     func apply(_ loadout:HeroLoadout,faction:Int,to actor:AnimatedCharacter,canvasOverrides:[String:[Int]]=[:])throws {
         let prefix=faction==1 ? "bri_m_" : "ger_m_"
-        var refs=[ClothingRef(name:prefix+"head001",layer:-10),ClothingRef(name:prefix+"head001_head001",layer:-10),ClothingRef(name:prefix+"body001",layer:-10),ClothingRef(name:prefix+"body001_body001",layer:-10),ClothingRef(name:prefix+"legs001",layer:-10),ClothingRef(name:prefix+"feet001",layer:-10)]
+        var refs=[ClothingRef(name:prefix+"head001",layer:-10),ClothingRef(name:prefix+"head001_head001",layer:-10),ClothingRef(name:prefix+"body001",layer:-10),ClothingRef(name:prefix+"body001_body001",layer:-10),ClothingRef(name:prefix+"legs001",layer:-10),ClothingRef(name:prefix+"feet001",layer:-10),ClothingRef(name:prefix+"hands001",layer:-10),ClothingRef(name:prefix+"hands001_hands001",layer:-10)]
         for id in loadout.clothing.sorted(by:{$0.key<$1.key}).map(\.value) { refs += byID[id]?.templates ?? [] }
         refs.sort{$0.layer<$1.layer}
         var meshes:[String:String]=[:],layers:[String:[ClothingTemplate]]=[:]
@@ -198,7 +199,7 @@ final class OriginalWardrobe {
             let tone=catalog.colors.first{$0.kind==(type.contains("hair") ? "hair" : "skin") && $0.id==(type.contains("hair") ? loadout.hair : loadout.skin)}?.rgb ?? [153,119,86]
             if ["cit_head","cit_headhair","cit_body","cit_hands","cit_legs","cit_feet"].contains(type) { context.setFillColor(CGColor(red:CGFloat(tone[0])/255,green:CGFloat(tone[1])/255,blue:CGFloat(tone[2])/255,alpha:1));context.fill(CGRect(x:0,y:0,width:width,height:height)) }
             for layer in stack { if let file=layer.texture,let original=image(file) {
-                let skinBase=file==catalog.templates[prefix+"head001_head001"]?.texture || file==catalog.templates[prefix+"body001_body001"]?.texture
+                let skinBase=file==catalog.templates[prefix+"head001_head001"]?.texture || file==catalog.templates[prefix+"body001_body001"]?.texture || file==catalog.templates[prefix+"hands001_hands001"]?.texture
                 let layerTone=layer.materialType.contains("hair") ? catalog.colors.first{$0.kind=="hair" && $0.id==loadout.hair}?.rgb ?? tone : tone
                 let im=skinBase || layer.materialType.contains("hair") ? tinted(original,tone:layerTone) : original
                 context.draw(im,in:CGRect(x:layer.coordinate[0],y:height-layer.coordinate[1]-im.height,width:im.width,height:im.height))
